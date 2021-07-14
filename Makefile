@@ -33,30 +33,31 @@ ASYNCIFY_NO="[ \
 	'git_config*', \
 	'git_filter*', \
 	'git_commit*', \
+	'git_merge*', \
 	'git_object*', \
 	'git_odb*', \
 	'git_pack*', \
 	'git_vector*', \
 	'git_index*', \
 	'git_pool*', \
-	'git_cached*', \
+	'git_cache*', \
 	'git_repository*', \
 	'git_submodule*', \
 	'git_signature*', \
 	'git_iterator*', \
 	'git_refspec*', \
-	'git_revwalk*', \
+	'git_rev*', \
 	'config_*', \
 	'patch_*', \
 	'diff_*', \
 	'xdl_*' \
 ]"
 
-EMCC_FLAGS= --pre-js src/interface.js \
+EMCC_FLAGS= --post-js src/interface.js \
 	 -I libgit2/include \
 	 -s MODULARIZE \
 	 -s ASYNCIFY \
-	 -s ASYNCIFY_IMPORTS=_emhttp_js_read \
+	 -s ASYNCIFY_IMPORTS=emhttp_js_read \
 	 -s ASYNCIFY_REMOVE=$(ASYNCIFY_NO) \
 	 -s EXPORTED_RUNTIME_METHODS=FS,writeArrayToMemory,ccall \
 	 -s ENVIRONMENT=node \
@@ -70,8 +71,7 @@ EMCC_FLAGS= --pre-js src/interface.js \
 EMCC_DEBUG_FLAGS= -O0 -g3 \
 	 -s LLD_REPORT_UNDEFINED \
 	 -s STACK_OVERFLOW_CHECK=2 \
-	 -s ASSERTIONS=2 \
-	 -s SAFE_HEAP
+	 -s ASSERTIONS=2
 
 EMCC_BUILD_FLAGS= -Oz -flto
 

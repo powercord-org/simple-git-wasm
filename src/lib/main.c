@@ -26,10 +26,18 @@
  */
 
 #include <emscripten.h>
+#include <time.h>
+#include <stdio.h>
 
 #include <git2/global.h>
 #include <git2/clone.h>
+#include <git2/merge.h>
 #include <git2/submodule.h>
+#include <git2/signature.h>
+#include <git2/repository.h>
+#include <git2/remote.h>
+#include <git2/stash.h>
+#include <git2/oid.h>
 
 // libgit2 doesn't support shallow clone -- see https://github.com/libgit2/libgit2/issues/3058
 
@@ -40,37 +48,68 @@ typedef struct { int init; git_submodule_update_options* options; } submodule_pa
 static int _process_submodule(git_submodule* submodule, const char* name, void* p) {
   submodule_payload* payload = (submodule_payload*) p;
   if (payload->options->version == 0) {
-    git_submodule_update_options_init(payload->options, 1);
+    git_submodule_update_options_init(payload->options, GIT_SUBMODULE_UPDATE_OPTIONS_VERSION);
     payload->options->fetch_opts.download_tags = GIT_REMOTE_DOWNLOAD_TAGS_NONE;
   }
 
   return git_submodule_update(submodule, payload->init, payload->options);
 }
 
+static int _extract_oid(const char *ref_name, const char *remote_url, const git_oid *oid, unsigned int is_merge, void *payload) {
+  UNUSED(ref_name);
+  UNUSED(remote_url);
+  if (is_merge) git_oid_cpy((git_oid*) payload, oid);
+  return 0;
+}
+
 static int update_submodules(git_repository* repo) {
-  int ret;
-  struct git_submodule_update_options submodule_options;
+  int ret = 0;
+  git_submodule_update_options submodule_options;
   submodule_payload* payload;
 
   payload = malloc(sizeof(submodule_payload));
   payload->init = 1;
   payload->options = &submodule_options;
   ret = git_submodule_foreach(repo, _process_submodule, payload);
-  free(payload);
 
+  free(payload);
+  return ret;
+}
+
+static int stash_changes(git_repository* repo) {
+  // Code from this function pretty much taken from libgit2's example stash.c.
+  int ret = 0;
+  git_signature *signature;
+  git_oid stashid;
+
+  ret = git_signature_now(&signature, "simple-git-wasm", "none@example.com");
+  if (ret < 0) return ret;
+
+  // Get current time to put in the message
+  char message[74] = "";
+  char time_str[26] = "";
+  time_t timer;
+  struct tm* tm_info;
+  timer = time(NULL);
+  tm_info = localtime(&timer);
+  strftime(time_str, 26, "%Y-%m-%d %H:%M:%S", tm_info);
+  snprintf(message, sizeof(message), "%s: simple-git-wasm: changes before pull", time_str);
+
+  ret = git_stash_save(&stashid, repo, signature, message, GIT_STASH_DEFAULT);
+	git_signature_free(signature);
   return ret;
 }
 
 EMSCRIPTEN_KEEPALIVE
-int clone(char* repository, char* destination) {
-  int ret;
-  struct git_repository* repo;
-  struct git_clone_options clone_options;
+int clone(char* repository, char* path) {
+  int ret = 0;
+  git_repository* repo;
+  git_clone_options clone_options;
 
-  git_clone_options_init(&clone_options, 1);
+  git_clone_options_init(&clone_options, GIT_CLONE_OPTIONS_VERSION);
   clone_options.fetch_opts.download_tags = GIT_REMOTE_DOWNLOAD_TAGS_NONE;
 
-  ret = git_clone(&repo, repository, destination, &clone_options);
+  ret = git_clone(&repo, repository, path, &clone_options);
   if (ret < 0) return ret;
 
   ret = update_submodules(repo);
@@ -79,8 +118,69 @@ int clone(char* repository, char* destination) {
 }
 
 EMSCRIPTEN_KEEPALIVE
-int pull() {
-  return -1;
+int pull(char* path, int force) {
+  int ret = 0;
+  git_repository* repo;
+  git_remote* remote;
+  git_reference* ref_current;
+  git_reference* ref_updated;
+	git_object* target;
+
+  git_oid oid;
+  git_fetch_options fetch_options;
+  git_checkout_options checkout_options;
+
+  ret = git_repository_open(&repo, path);
+  if (ret < 0) goto pull_end;
+
+  if (force) {
+    // [Cynthia] Design choice from Powercord here; force-pull = discard all local changes.
+    // We used to reset --hard, here we stash the local changes so they aren't completely lost.
+    ret = stash_changes(repo);
+    if (ret < 0) goto pull_end;
+  }
+
+  // Lookup the remote
+  ret = git_remote_lookup(&remote, repo, "origin");
+  if (ret < 0) goto pull_end;
+
+  // Update FETCH_HEAD
+  git_fetch_options_init(&fetch_options, GIT_FETCH_OPTIONS_VERSION);
+  ret = git_remote_fetch(remote, NULL, &fetch_options, NULL);
+  if (ret < 0) goto pull_end;
+
+  // Find out the object id to merge
+  ret = git_repository_fetchhead_foreach(repo, _extract_oid, &oid);
+  if (ret < 0) goto pull_end;
+
+  // Retrieve current reference
+  ret = git_repository_head(&ref_current, repo);
+  if (ret < 0) goto pull_end;
+
+  // Lookup target object
+  ret = git_object_lookup(&target, repo, &oid, GIT_OBJECT_COMMIT);
+  if (ret < 0) goto pull_end;
+
+  // Fast-forward checkout
+  git_checkout_options_init(&checkout_options, GIT_CHECKOUT_OPTIONS_VERSION);
+  checkout_options.checkout_strategy = GIT_CHECKOUT_SAFE;
+  ret = git_checkout_tree(repo, target, &checkout_options);
+  if (ret < 0) goto pull_end;
+
+  // Move references
+  ret = git_reference_set_target(&ref_updated, ref_current, &oid, NULL);
+  if (ret < 0) goto pull_end;
+
+  // Update submodules
+  ret = update_submodules(repo);
+pull_end:
+  // Cleanup & return
+  git_reference_free(ref_current);
+  git_reference_free(ref_updated);
+  git_object_free(target);
+  git_remote_free(remote);
+  git_repository_free(repo);
+  return ret;
 }
 
 int main() {

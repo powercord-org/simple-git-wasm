@@ -45,6 +45,13 @@ async function getLibgit () {
   return libgitPromise
 }
 
+function setupFs (libgit, path) {
+  const dir = Math.random().toString(16).slice(2)
+  libgit.FS.mkdir(dir)
+  libgit.FS.mount(libgit.FS.filesystems.NODEFS, { root: path }, dir)
+  return dir
+}
+
 async function canClone (path) {
   try {
     const res = await stat(path)
@@ -68,19 +75,21 @@ async function clone (repo, path) {
 
   const libgit = await getLibgit()
 
-  // Workaround for the fact we can't run with default fs as nodefs
-  // See: https://github.com/emscripten-core/emscripten/issues/7487
-  const dir = Math.random().toString(16).slice(2)
-  libgit.FS.mkdir(dir)
-  libgit.FS.mount(libgit.FS.filesystems.NODEFS, { root: path }, dir)
+  const dir = setupFs(libgit, path)
   const res = await libgit.ccall('clone', 'number', [ 'string', 'string' ], [ repo, dir ], { async: true })
   libgit.FS.unmount(dir)
-  return res
+  return res;
 }
 
-async function pull (path) {
-  // todo
-  // libgit.ccall('pull')
+async function pull (path, force = false) {
+  // todo: verify specified path is a git repo
+  path = resolve(path)
+  const libgit = await getLibgit()
+
+  const dir = setupFs(libgit, path)
+  const res = await libgit.ccall('pull', 'number', [ 'string', 'number' ], [ dir, force ], { async: true })
+  libgit.FS.unmount(dir)
+  return res
 }
 
 module.exports = {
