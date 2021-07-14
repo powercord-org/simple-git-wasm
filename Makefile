@@ -24,7 +24,9 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# Remove useless instrumentation from the binary. Saves 200KB+. Runs faster. Worth.
+# Remove useless instrumentation from the binary. Saves 300KB+. Runs faster. Worth.
+# Unsure if this is fully stable though, it didn't cause issues in my limited testing but who knows.
+# This is also kind of dirty, maybe a cleaner handcrafted list can yield better results but I'm happy with that.
 ASYNCIFY_NO="[ \
 	'git_threadstate*', \
 	'git_buf*', \
@@ -39,14 +41,22 @@ ASYNCIFY_NO="[ \
 	'git_pool*', \
 	'git_cached*', \
 	'git_repository*', \
+	'git_submodule*', \
+	'git_signature*', \
+	'git_iterator*', \
+	'git_refspec*', \
+	'git_revwalk*', \
+	'config_*', \
+	'patch_*', \
+	'diff_*', \
 	'xdl_*' \
 ]"
 
-EMCC_FLAGS= --post-js src/interface.js \
+EMCC_FLAGS= --pre-js src/interface.js \
 	 -I libgit2/include \
 	 -s MODULARIZE \
 	 -s ASYNCIFY \
-	 -s ASYNCIFY_IMPORTS=emhttp_js_read \
+	 -s ASYNCIFY_IMPORTS=_emhttp_js_read \
 	 -s ASYNCIFY_REMOVE=$(ASYNCIFY_NO) \
 	 -s EXPORTED_RUNTIME_METHODS=FS,writeArrayToMemory,ccall \
 	 -s ENVIRONMENT=node \
@@ -78,10 +88,13 @@ libgit2/build/libgit2.a:
 	cd libgit2/build && emcmake cmake \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DCMAKE_C_FLAGS="-Oz" \
+		-DSONAME=OFF \
+		-DBUILD_SHARED_LIBS=OFF \
+		-DBUILD_CLAR=OFF \
 		-DUSE_HTTPS=OFF \
 		-DUSE_SSH=OFF \
 		-DTHREADSAFE=OFF \
-		-DREGEX_BACKEND=builtin \
+		-DREGEX_BACKEND=regcomp \
 		..
 	cd libgit2/build && emmake make -j
 

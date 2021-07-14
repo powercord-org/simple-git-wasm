@@ -26,29 +26,64 @@
  */
 
 #include <emscripten.h>
-#include <stdio.h>
 
-#include <git2/clone.h>
 #include <git2/global.h>
+#include <git2/clone.h>
+#include <git2/submodule.h>
 
 // libgit2 doesn't support shallow clone -- see https://github.com/libgit2/libgit2/issues/3058
 
-EMSCRIPTEN_KEEPALIVE
-int clone (char* repository, char* destination) {
-  // todo: submodule init after clone
-  struct git_repository* repo;
-  struct git_clone_options options;
-  git_clone_options_init(&options, 1);
-  options.fetch_opts.download_tags = GIT_REMOTE_DOWNLOAD_TAGS_NONE;
-  return git_clone(&repo, repository, destination, &options);
+#define UNUSED(x) (void)(x)
+
+typedef struct { int init; git_submodule_update_options* options; } submodule_payload;
+
+static int _process_submodule(git_submodule* submodule, const char* name, void* p) {
+  submodule_payload* payload = (submodule_payload*) p;
+  if (payload->options->version == 0) {
+    git_submodule_update_options_init(payload->options, 1);
+    payload->options->fetch_opts.download_tags = GIT_REMOTE_DOWNLOAD_TAGS_NONE;
+  }
+
+  return git_submodule_update(submodule, payload->init, payload->options);
+}
+
+static int update_submodules(git_repository* repo) {
+  int ret;
+  struct git_submodule_update_options submodule_options;
+  submodule_payload* payload;
+
+  payload = malloc(sizeof(submodule_payload));
+  payload->init = 1;
+  payload->options = &submodule_options;
+  ret = git_submodule_foreach(repo, _process_submodule, payload);
+  free(payload);
+
+  return ret;
 }
 
 EMSCRIPTEN_KEEPALIVE
-int pull () {
+int clone(char* repository, char* destination) {
+  int ret;
+  struct git_repository* repo;
+  struct git_clone_options clone_options;
+
+  git_clone_options_init(&clone_options, 1);
+  clone_options.fetch_opts.download_tags = GIT_REMOTE_DOWNLOAD_TAGS_NONE;
+
+  ret = git_clone(&repo, repository, destination, &clone_options);
+  if (ret < 0) return ret;
+
+  ret = update_submodules(repo);
+  git_repository_free(repo);
+  return ret;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int pull() {
   return -1;
 }
 
-int main () {
+int main() {
   git_libgit2_init();
   return 0;
 }
