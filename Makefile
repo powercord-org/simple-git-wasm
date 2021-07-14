@@ -46,7 +46,7 @@ EMCC_FLAGS= --post-js src/interface.js \
 	 -I libgit2/include \
 	 -s MODULARIZE \
 	 -s ASYNCIFY \
-	 -s ASYNCIFY_IMPORTS=_emhttp_js_read \
+	 -s ASYNCIFY_IMPORTS=emhttp_js_read \
 	 -s ASYNCIFY_REMOVE=$(ASYNCIFY_NO) \
 	 -s EXPORTED_RUNTIME_METHODS=FS,writeArrayToMemory,ccall \
 	 -s ENVIRONMENT=node \
@@ -57,14 +57,13 @@ EMCC_FLAGS= --post-js src/interface.js \
 	 libgit2/build/libgit2.a \
 	 src/lib/main.c
 
-EMCC_DEBUG_FLAGS= $(EMCC_FLAGS) \
-   -O0 -g3 \
+EMCC_DEBUG_FLAGS= -O0 -g3 \
 	 -s LLD_REPORT_UNDEFINED \
 	 -s STACK_OVERFLOW_CHECK=2 \
 	 -s ASSERTIONS=2 \
 	 -s SAFE_HEAP
 
-EMCC_BUILD_FLAGS= $(EMCC_FLAGS)  -Oz -flto -g0
+EMCC_BUILD_FLAGS= -Oz -flto
 
 libgit2/build/libgit2.a:
 	# Work folder
@@ -86,10 +85,12 @@ libgit2/build/libgit2.a:
 		..
 	cd libgit2/build && emmake make -j
 
+.PHONY: build
 build: libgit2/build/libgit2.a
 	rm -rf src/wasm && mkdir src/wasm
-	emcc $(EMCC_BUILD_FLAGS)
+	emcc $(EMCC_FLAGS) $(EMCC_BUILD_FLAGS)
 
+.PHONY: debug
 debug: libgit2/build/libgit2.a
 	rm -rf src/wasm && mkdir src/wasm
-	emcc $(EMCC_DEBUG_FLAGS)
+	emcc $(EMCC_FLAGS) $(EMCC_DEBUG_FLAGS)

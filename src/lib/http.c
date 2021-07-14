@@ -30,6 +30,7 @@
 #include <emscripten.h>
 #include <git2/transport.h>
 #include "smart.h"
+#include "http.h"
 
 #define EMHTTP_ALLOC_CONNECTION(url, isPost) \
   EM_ASM_INT({ return Module.createConnection(UTF8ToString($0), $1); }, url, isPost)
@@ -46,7 +47,7 @@ typedef struct { git_smart_subtransport parent; transport_smart* owner; } emhttp
 typedef struct { git_smart_subtransport_stream parent; const char* service_url; int connectionId; } emhttp_stream;
 
 // HTTP interface -- only read is an async op, everything else can be treated as synchronous.
-EM_JS(int, _emhttp_js_read, (int connId, const char* buffer, size_t len), {
+EM_JS(int, emhttp_js_read, (int connId, const char* buffer, size_t len), {
   return Asyncify.handleAsync(() => Module.readFromConnection(connId, buffer, len));
 });
 
@@ -56,7 +57,7 @@ static int _emhttp_stream_read (git_smart_subtransport_stream* stream, char* buf
     s->connectionId = EMHTTP_ALLOC_CONNECTION(s->service_url, false);
   }
 
-  *bytes_read = _emhttp_js_read(s->connectionId, buffer, buf_size);
+  *bytes_read = emhttp_js_read(s->connectionId, buffer, buf_size);
   return 0;
 }
 

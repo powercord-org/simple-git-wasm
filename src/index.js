@@ -61,8 +61,8 @@ async function canClone (path) {
 async function clone (repo, path) {
   path = resolve(path)
   if (!canClone(path)) {
-    // [Cynthia] This check would be normally done by Git, but considering we need to wake up workers
-    // and queue tasks, best to check beforehand.
+    // [Cynthia] This check would be normally done by Git, but considering
+    // we need to wake up workers and queue tasks, best to check beforehand.
     throw new Error(`Cannot clone the repository in ${path}`)
   }
 

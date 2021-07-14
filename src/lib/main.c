@@ -35,6 +35,7 @@
 
 EMSCRIPTEN_KEEPALIVE
 int clone (char* repository, char* destination) {
+  // todo: submodule init after clone
   struct git_repository* repo;
   struct git_clone_options options;
   git_clone_options_init(&options, 1);

@@ -44,7 +44,7 @@ function createConnection (url, isPost) {
   }
 
   const req = client.request(url, { method: method, headers: headers })
-  connections.set(connId, { req: req, data: null, ptr: 0 })
+  connections.set(connId, { req: req, res: null })
   return connId;
 }
 
@@ -58,27 +58,21 @@ function writeToConnection (connId, bufferPtr, length) {
 }
 
 async function readFromConnection (connId, bufferPtr, length) {
-  // [Cynthia] This method reads the entire buffer and puts it in memory.
-  // This may not be the most efficient way of doing it, and I kinda want
-  // to refactor it to more cleanly read the connection.
   const conn = connections.get(connId)
   if (!conn) return -1
 
-  if (!conn.data) {
-    conn.data = await new Promise((resolve) => {
-      conn.req.end()
-      conn.req.on('response', (res) => {
-        const chunks = []
-        res.on('data', (chk) => chunks.push(chk))
-        res.on('end', () => resolve(Buffer.concat(chunks)))
-      })
-    })
+  // [Cynthia] We don't have to worry about concurrent calls here, as this is
+  // called by C code which is synchronous and paused until this call completes.
+  if (!conn.res) {
+    conn.req.end()
+    conn.req.on('response', (res) => (conn.res = res))
   }
 
-  const read = Math.min(conn.data.length - conn.ptr, length)
-  Module.writeArrayToMemory(conn.data.slice(conn.ptr, conn.ptr + read), bufferPtr)
-  conn.ptr += read
-  return read
+  let buf
+  // Emscripten doesn't support optional chaining
+  while (!(buf = conn.res && conn.res.read(length))) await new Promise((resolve) => setImmediate(resolve))
+  Module.writeArrayToMemory(buf, bufferPtr)
+  return buf.length
 }
 
 function freeConnection (connId) {
