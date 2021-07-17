@@ -26,12 +26,10 @@
  */
 
 #include <emscripten.h>
-#include <time.h>
-#include <stdio.h>
+#include <pthread.h>
 
 #include <git2/global.h>
 #include <git2/clone.h>
-#include <git2/merge.h>
 #include <git2/submodule.h>
 #include <git2/signature.h>
 #include <git2/repository.h>
@@ -41,84 +39,81 @@
 
 // libgit2 doesn't support shallow clone -- see https://github.com/libgit2/libgit2/issues/3058
 
-#define UNUSED(x) (void)(x)
+#define UNUSED(X) (void)(X)
+#define RESOLVE(PTR, RET) MAIN_THREAD_ASYNC_EM_ASM({ WasmModule.invokeDeferred($0, $1); }, PTR, RET)
 
-typedef struct { int init; git_submodule_update_options* options; } submodule_payload;
+typedef struct { char* repository; char* path; int resolve_ptr; } clone_payload;
+typedef struct { char* path; int force; int resolve_ptr; } pull_payload;
 
-static int _process_submodule(git_submodule* submodule, const char* name, void* p) {
-  submodule_payload* payload = (submodule_payload*) p;
-  if (payload->options->version == 0) {
-    git_submodule_update_options_init(payload->options, GIT_SUBMODULE_UPDATE_OPTIONS_VERSION);
-    payload->options->fetch_opts.download_tags = GIT_REMOTE_DOWNLOAD_TAGS_NONE;
+static int _process_submodule(git_submodule* submodule, const char* name, void* payload) {
+  git_submodule_update_options* options = (git_submodule_update_options*) payload;
+  if (options->version == 0) {
+    git_submodule_update_options_init(options, GIT_SUBMODULE_UPDATE_OPTIONS_VERSION);
+    options->fetch_opts.download_tags = GIT_REMOTE_DOWNLOAD_TAGS_NONE;
   }
 
-  return git_submodule_update(submodule, payload->init, payload->options);
+  return git_submodule_update(submodule, 1, options);
 }
 
-static int _extract_oid(const char *ref_name, const char *remote_url, const git_oid *oid, unsigned int is_merge, void *payload) {
+static int _extract_oid(const char* ref_name, const char* remote_url, const git_oid* oid, unsigned int is_merge, void* payload) {
   UNUSED(ref_name);
   UNUSED(remote_url);
   if (is_merge) git_oid_cpy((git_oid*) payload, oid);
   return 0;
 }
 
+EM_JS(char*, get_message, (), {
+  const date = new Date().toString() + ": simple-git-wasm: changes before pull";
+  const size = lengthBytesUTF8(jsString) + 1;
+  const ptr = _malloc(size);
+  stringToUTF8(date, ptr, size);
+  return ptr;
+});
+
 static int update_submodules(git_repository* repo) {
   int ret = 0;
   git_submodule_update_options submodule_options;
-  submodule_payload* payload;
-
-  payload = malloc(sizeof(submodule_payload));
-  payload->init = 1;
-  payload->options = &submodule_options;
-  ret = git_submodule_foreach(repo, _process_submodule, payload);
-
-  free(payload);
+  ret = git_submodule_foreach(repo, _process_submodule, &submodule_options);
   return ret;
 }
 
 static int stash_changes(git_repository* repo) {
   // Code from this function pretty much taken from libgit2's example stash.c.
   int ret = 0;
-  git_signature *signature;
+  git_signature* signature;
   git_oid stashid;
 
   ret = git_signature_now(&signature, "simple-git-wasm", "none@example.com");
   if (ret < 0) return ret;
 
-  // Get current time to put in the message
-  char message[74] = "";
-  char time_str[26] = "";
-  time_t timer;
-  struct tm* tm_info;
-  timer = time(NULL);
-  tm_info = localtime(&timer);
-  strftime(time_str, 26, "%Y-%m-%d %H:%M:%S", tm_info);
-  snprintf(message, sizeof(message), "%s: simple-git-wasm: changes before pull", time_str);
-
+  char* message = get_message();
   ret = git_stash_save(&stashid, repo, signature, message, GIT_STASH_DEFAULT);
 	git_signature_free(signature);
+  free(message);
   return ret;
 }
 
-EMSCRIPTEN_KEEPALIVE
-int clone(char* repository, char* path) {
+static void* clone_repository(void* payload) {
   int ret = 0;
   git_repository* repo;
   git_clone_options clone_options;
+  clone_payload* opts = (clone_payload*) payload;
 
   git_clone_options_init(&clone_options, GIT_CLONE_OPTIONS_VERSION);
   clone_options.fetch_opts.download_tags = GIT_REMOTE_DOWNLOAD_TAGS_NONE;
 
-  ret = git_clone(&repo, repository, path, &clone_options);
-  if (ret < 0) return ret;
+  ret = git_clone(&repo, opts->repository, opts->path, NULL);
+  if (ret < 0) goto clone_end;
 
   ret = update_submodules(repo);
+clone_end:
   git_repository_free(repo);
-  return ret;
+  RESOLVE(opts->resolve_ptr, ret);
+  free(payload);
+  return NULL;
 }
 
-EMSCRIPTEN_KEEPALIVE
-int pull(char* path, int force) {
+static void* pull_repository(void* payload) {
   int ret = 0;
   git_repository* repo;
   git_remote* remote;
@@ -129,11 +124,12 @@ int pull(char* path, int force) {
   git_oid oid;
   git_fetch_options fetch_options;
   git_checkout_options checkout_options;
+  pull_payload* opts = (pull_payload*) payload;
 
-  ret = git_repository_open(&repo, path);
+  ret = git_repository_open(&repo, opts->path);
   if (ret < 0) goto pull_end;
 
-  if (force) {
+  if (opts->force) {
     // [Cynthia] Design choice from Powercord here; force-pull = discard all local changes.
     // We used to reset --hard, here we stash the local changes so they aren't completely lost.
     ret = stash_changes(repo);
@@ -180,7 +176,41 @@ pull_end:
   git_object_free(target);
   git_remote_free(remote);
   git_repository_free(repo);
-  return ret;
+  RESOLVE(opts->resolve_ptr, ret);
+  free(payload);
+  return NULL;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int clone(char* repository, char* path, int resolve_ptr) {
+  pthread_t pid;
+  clone_payload* payload;
+
+  payload = malloc(sizeof(clone_payload));
+  if (payload == NULL) return -1;
+  payload->repository = repository;
+  payload->path = path;
+  payload->resolve_ptr = resolve_ptr;
+
+  pthread_create(&pid, NULL, clone_repository, (void*) payload);
+  pthread_detach(pid);
+  return 0;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int pull(char* path, int force, int resolve_ptr) {
+  pthread_t pid;
+  pull_payload* payload;
+
+  payload = malloc(sizeof(pull_payload));
+  if (payload == NULL) return -1;
+  payload->path = path;
+  payload->force = force;
+  payload->resolve_ptr = resolve_ptr;
+
+  pthread_create(&pid, NULL, pull_repository, (void*) payload);
+  pthread_detach(pid);
+  return 0;
 }
 
 int main() {

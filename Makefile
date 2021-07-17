@@ -24,46 +24,17 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# Remove useless instrumentation from the binary. Saves 300KB+. Runs faster. Worth.
-# Unsure if this is fully stable though, it didn't cause issues in my limited testing but who knows.
-# This is also kind of dirty, maybe a cleaner handcrafted list can yield better results but I'm happy with that.
-ASYNCIFY_NO="[ \
-	'git_threadstate*', \
-	'git_buf*', \
-	'git_config*', \
-	'git_filter*', \
-	'git_commit*', \
-	'git_merge*', \
-	'git_object*', \
-	'git_odb*', \
-	'git_pack*', \
-	'git_vector*', \
-	'git_index*', \
-	'git_pool*', \
-	'git_cache*', \
-	'git_repository*', \
-	'git_submodule*', \
-	'git_signature*', \
-	'git_iterator*', \
-	'git_refspec*', \
-	'git_rev*', \
-	'config_*', \
-	'patch_*', \
-	'diff_*', \
-	'xdl_*' \
-]"
-
 EMCC_FLAGS= --post-js src/interface.js \
 	 -I libgit2/include \
 	 -s MODULARIZE \
-	 -s ASYNCIFY \
-	 -s ASYNCIFY_IMPORTS=emhttp_js_read \
-	 -s ASYNCIFY_REMOVE=$(ASYNCIFY_NO) \
-	 -s EXPORTED_RUNTIME_METHODS=FS,writeArrayToMemory,ccall \
+	 -s EXPORTED_RUNTIME_METHODS=FS,writeArrayToMemory,lengthBytesUTF8,stringToUTF8,ccall \
 	 -s ENVIRONMENT=node \
 	 -s ALLOW_MEMORY_GROWTH \
-	 -s SUPPORT_LONGJMP=0 \
+	 -s EXPORT_NAME=WasmModule \
+	 -s PTHREAD_POOL_SIZE='Math.max(require("os").cpus.length - 1, 1)' \
+	 -s PTHREAD_POOL_SIZE_STRICT=2 \
 	 -lnodefs.js \
+   -pthread \
 	 -o src/wasm/libgit.js \
 	 libgit2/build/libgit2.a \
 	 src/lib/main.c
@@ -87,13 +58,12 @@ libgit2/build/libgit2.a:
 	# Build the lib
 	cd libgit2/build && emcmake cmake \
 		-DCMAKE_BUILD_TYPE=Release \
-		-DCMAKE_C_FLAGS="-Oz" \
+		-DCMAKE_C_FLAGS="-Oz -pthread" \
 		-DSONAME=OFF \
 		-DBUILD_SHARED_LIBS=OFF \
 		-DBUILD_CLAR=OFF \
 		-DUSE_HTTPS=OFF \
 		-DUSE_SSH=OFF \
-		-DTHREADSAFE=OFF \
 		-DREGEX_BACKEND=regcomp \
 		..
 	cd libgit2/build && emmake make -j

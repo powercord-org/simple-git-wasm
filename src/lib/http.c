@@ -32,9 +32,6 @@
 #include "smart.h"
 #include "http.h"
 
-#define EMHTTP_ALLOC_CONNECTION(url, isPost) \
-  EM_ASM_INT({ return Module.createConnection(UTF8ToString($0), $1); }, url, isPost)
-
 // Constants -- copied from http.c and winhttp.c
 bool git_http__expect_continue = false;
 static const char* upload_pack_ls_service_url = "/info/refs?service=git-upload-pack";
@@ -46,33 +43,45 @@ static const char* receive_pack_service_url = "/git-receive-pack";
 typedef struct { git_smart_subtransport parent; transport_smart* owner; } emhttp_subtransport;
 typedef struct { git_smart_subtransport_stream parent; const char* service_url; int connectionId; } emhttp_stream;
 
-// HTTP interface -- only read is an async op, everything else can be treated as synchronous.
-EM_JS(int, emhttp_js_read, (int connId, const char* buffer, size_t len), {
-  return Asyncify.handleAsync(() => Module.readFromConnection(connId, buffer, len));
-});
+// HTTP interface
+static int emhttp_connection_read(int connId, const char* buf, size_t len) {
+  int bytes_read = -2;
+  MAIN_THREAD_ASYNC_EM_ASM({ WasmModule.readFromConnection($0, $1, $2, $3) }, connId, buf, len, &bytes_read);
+
+  // [Cynthia] Sync notes: we can safely lock the thread, as in our case this will never run in the main thread.
+  // The HTTP request will happen in the main thread, safe from any kind of event loop lock.
+  while (bytes_read == -2) { usleep(10); }
+  return bytes_read;
+}
+
+static int emhttp_connection_alloc(char* url, int isPost) {
+  return MAIN_THREAD_EM_ASM_INT({ return WasmModule.createConnection(UTF8ToString($0), $1); }, url, isPost);
+}
 
 static int _emhttp_stream_read(git_smart_subtransport_stream* stream, char* buffer, size_t buf_size, size_t* bytes_read) {
   emhttp_stream* s = (emhttp_stream*) stream;
   if (s->connectionId == -1) {
-    s->connectionId = EMHTTP_ALLOC_CONNECTION(s->service_url, false);
+    s->connectionId = emhttp_connection_alloc(s->service_url, false);
   }
 
-  *bytes_read = emhttp_js_read(s->connectionId, buffer, buf_size);
+  int read = emhttp_connection_read(s->connectionId, buffer, buf_size);
+  if (read < 0) return read;
+  *bytes_read = read;
   return 0;
 }
 
 static int _emhttp_stream_write(git_smart_subtransport_stream* stream, const char* buffer, size_t len) {
   emhttp_stream* s = (emhttp_stream*) stream;
   if (s->connectionId == -1) {
-    s->connectionId = EMHTTP_ALLOC_CONNECTION(s->service_url, true);
+    s->connectionId = emhttp_connection_alloc(s->service_url, true);
   }
 
-  return EM_ASM_INT({ return Module.writeToConnection($0, $1, $2); }, s->connectionId, buffer, len);
+  return MAIN_THREAD_EM_ASM_INT({ return WasmModule.writeToConnection($0, $1, $2); }, s->connectionId, buffer, len);
 }
 
 static void _emhttp_stream_free(git_smart_subtransport_stream* stream) {
 	emhttp_stream* s = (emhttp_stream*) stream;
-  EM_ASM({ Module.freeConnection($0); }, s->connectionId);
+  MAIN_THREAD_EM_ASM({ WasmModule.freeConnection($0); }, s->connectionId);
 	git__free(s);
 }
 

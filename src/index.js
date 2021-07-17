@@ -74,13 +74,34 @@ async function clone (repo, path) {
   }
 
   const libgit = await getLibgit()
-
   const dir = setupFs(libgit, path)
-  const res = await libgit.ccall('clone', 'number', [ 'string', 'string' ], [ repo, dir ], { async: true })
-  libgit.FS.unmount(dir)
-  return res;
+
+  // Alloc stuff
+  const repoPtr = libgit.allocString(repo)
+  const pathPtr = libgit.allocString(dir)
+  const [ promise, deferredPtr ] = libgit.allocDeferred()
+  function freeResources () {
+    libgit._free(repoPtr)
+    libgit._free(pathPtr)
+    libgit.freeDeferred(deferredPtr)
+    libgit.FS.unmount(dir)
+  }
+
+  // Invoke our function, once we have a worker ready to handle the new thread
+  // Note: unless an error occurred, it is unsafe to free resources before the promise resolves
+  while (!libgit.PThread.unusedWorkers.length) await new Promise((resolve) => setImmediate(resolve))
+  let res = libgit.ccall('clone', 'number', [ 'number', 'number', 'number' ], [ repoPtr, pathPtr, deferredPtr ])
+  if (res < 0) {
+    freeResources()
+    throw new Error('Failed to initialize git thread')
+  }
+
+  res = await promise
+  freeResources()
+  return res
 }
 
+// todo: re-write this to the new pull function signature and stuff
 async function pull (path, force = false) {
   // todo: verify specified path is a git repo
   path = resolve(path)
