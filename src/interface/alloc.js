@@ -25,37 +25,30 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-const { resolve } = require('path')
-const libgitFactory = require('./wasm/libgit.js')
-
-let libgitPromise
-async function getLibgit () {
-  // Lazily init the wasm binary when we need it
-  if (!libgitPromise) libgitPromise = libgitFactory()
-  return libgitPromise
+function allocString (str) {
+  const length = lengthBytesUTF8(str) + 1
+  const ptr = _malloc(length)
+  stringToUTF8(str, ptr, length)
+  return ptr
 }
 
-// todo: allow enforcing signed commits
-// todo: add an integrity check for github repos
-async function clone (repo, path) {
-  const libgit = await getLibgit()
-  const ret = libgit.clone(repo, resolve(path))
-  // todo: process ret and throw/return based on it
-  return ret
+let deferredId = 0
+const deferred = new Map()
+function allocDeferred () {
+  let resolve
+  const ptr = deferredId++
+  const promise = new Promise((r) => (resolve = r))
+  deferred.set(ptr, resolve)
+  return [ promise, ptr ]
 }
 
-// todo: allow enforcing signed commits
-// todo: add an integrity check for github repos
-async function pull (path, force = false) {
-  const libgit = await getLibgit()
-  const ret = libgit.pull(resolve(path), force)
-  // todo: process ret and throw/return based on it
-  return ret
+function invokeDeferred (ptr, ...args) {
+  const resolve = deferred.get(ptr)
+  if (!resolve) throw new Error('segmentation fault')
+  deferred.delete(ptr)
+  resolve(...args)
 }
 
-// todo: function to get new remote commits (+ signature status)
-
-module.exports = {
-  clone,
-  pull
+function freeDeferred (ptr) {
+  return deferred.delete(ptr)
 }

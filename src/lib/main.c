@@ -38,9 +38,10 @@
 #include <git2/oid.h>
 
 // libgit2 doesn't support shallow clone -- see https://github.com/libgit2/libgit2/issues/3058
+// note: a patch to libgit is necessary to get this to compile -- see https://github.com/libgit2/libgit2/pull/5935
 
 #define UNUSED(X) (void)(X)
-#define RESOLVE(PTR, RET) MAIN_THREAD_ASYNC_EM_ASM({ WasmModule.invokeDeferred($0, $1); }, PTR, RET)
+#define RESOLVE(PTR, RET) MAIN_THREAD_ASYNC_EM_ASM({ invokeDeferred($0, $1); }, PTR, RET)
 
 typedef struct { char* repository; char* path; int resolve_ptr; } clone_payload;
 typedef struct { char* path; int force; int resolve_ptr; } pull_payload;
@@ -64,7 +65,7 @@ static int _extract_oid(const char* ref_name, const char* remote_url, const git_
 
 EM_JS(char*, get_message, (), {
   const date = new Date().toString() + ": simple-git-wasm: changes before pull";
-  const size = lengthBytesUTF8(jsString) + 1;
+  const size = lengthBytesUTF8(date) + 1;
   const ptr = _malloc(size);
   stringToUTF8(date, ptr, size);
   return ptr;

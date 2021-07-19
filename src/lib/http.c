@@ -46,7 +46,7 @@ typedef struct { git_smart_subtransport_stream parent; const char* service_url; 
 // HTTP interface
 static int emhttp_connection_read(int connId, const char* buf, size_t len) {
   int bytes_read = -2;
-  MAIN_THREAD_ASYNC_EM_ASM({ WasmModule.readFromConnection($0, $1, $2, $3) }, connId, buf, len, &bytes_read);
+  MAIN_THREAD_ASYNC_EM_ASM({ readFromConnection($0, $1, $2, $3) }, connId, buf, len, &bytes_read);
 
   // [Cynthia] Sync notes: we can safely lock the thread, as in our case this will never run in the main thread.
   // The HTTP request will happen in the main thread, safe from any kind of event loop lock.
@@ -55,7 +55,7 @@ static int emhttp_connection_read(int connId, const char* buf, size_t len) {
 }
 
 static int emhttp_connection_alloc(char* url, int isPost) {
-  return MAIN_THREAD_EM_ASM_INT({ return WasmModule.createConnection(UTF8ToString($0), $1); }, url, isPost);
+  return MAIN_THREAD_EM_ASM_INT({ return createConnection(UTF8ToString($0), $1); }, url, isPost);
 }
 
 static int _emhttp_stream_read(git_smart_subtransport_stream* stream, char* buffer, size_t buf_size, size_t* bytes_read) {
@@ -76,12 +76,12 @@ static int _emhttp_stream_write(git_smart_subtransport_stream* stream, const cha
     s->connectionId = emhttp_connection_alloc(s->service_url, true);
   }
 
-  return MAIN_THREAD_EM_ASM_INT({ return WasmModule.writeToConnection($0, $1, $2); }, s->connectionId, buffer, len);
+  return MAIN_THREAD_EM_ASM_INT({ return writeToConnection($0, $1, $2); }, s->connectionId, buffer, len);
 }
 
 static void _emhttp_stream_free(git_smart_subtransport_stream* stream) {
 	emhttp_stream* s = (emhttp_stream*) stream;
-  MAIN_THREAD_EM_ASM({ WasmModule.freeConnection($0); }, s->connectionId);
+  MAIN_THREAD_EM_ASM({ freeConnection($0); }, s->connectionId);
 	git__free(s);
 }
 

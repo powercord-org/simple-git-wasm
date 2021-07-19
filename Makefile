@@ -24,27 +24,35 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-EMCC_FLAGS= --post-js src/interface.js \
+EMCC_CACHE=.emcc-cache
+
+EMCC_FLAGS= --cache $(EMCC_CACHE) \
+	--pre-js src/interface/alloc.js \
+	--pre-js src/interface/http.js \
+	--post-js src/interface/exports.js \
 	 -I libgit2/include \
 	 -s MODULARIZE \
-	 -s EXPORTED_RUNTIME_METHODS=FS,writeArrayToMemory,lengthBytesUTF8,stringToUTF8,ccall \
+	 -s EXPORTED_RUNTIME_METHODS=FS,writeArrayToMemory,lengthBytesUTF8,stringToUTF8 \
 	 -s ENVIRONMENT=node \
 	 -s ALLOW_MEMORY_GROWTH \
 	 -s EXPORT_NAME=WasmModule \
 	 -s PTHREAD_POOL_SIZE='Math.max(require("os").cpus.length - 1, 1)' \
 	 -s PTHREAD_POOL_SIZE_STRICT=2 \
+	 -s TEXTDECODER=2 \
+	 -s MALLOC=emmalloc \
+	 -pthread \
 	 -lnodefs.js \
-   -pthread \
+	 -lstrings.js \
 	 -o src/wasm/libgit.js \
 	 libgit2/build/libgit2.a \
-	 src/lib/main.c
+	 src/lib/main.c \
+	 -Wno-pthreads-mem-growth
 
 EMCC_DEBUG_FLAGS= -O0 -g3 \
 	 -s LLD_REPORT_UNDEFINED \
-	 -s STACK_OVERFLOW_CHECK=2 \
-	 -s ASSERTIONS=2
+	 -s ASSERTIONS=1
 
-EMCC_BUILD_FLAGS= -Oz -flto
+EMCC_BUILD_FLAGS= -Oz -flto --closure 1 -s USE_CLOSURE_COMPILER
 
 libgit2/build/libgit2.a:
 	# Work folder
@@ -77,3 +85,8 @@ build: libgit2/build/libgit2.a
 debug: libgit2/build/libgit2.a
 	rm -rf src/wasm && mkdir src/wasm
 	emcc $(EMCC_FLAGS) $(EMCC_DEBUG_FLAGS)
+
+.PHONY: clear
+clear:
+	rm -rf libgit2/build || true
+	emcc --cache $(EMCC_CACHE) --clear-cache

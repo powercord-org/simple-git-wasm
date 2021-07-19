@@ -25,14 +25,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-// Interface to let the wasm binary use http/https bundled with Node
-
-const connections = new Map()
-const deferred = new Map()
 let connectionId = 0
-let deferredId = 0
+const connections = new Map()
 
-WasmModule['createConnection'] = function (url, isPost) {
+function createConnection (url, isPost) {
   const connId = connectionId++
   const client = url.startsWith('https') ? require('https') : require('http')
   const headers = {}
@@ -50,7 +46,7 @@ WasmModule['createConnection'] = function (url, isPost) {
   return connId;
 }
 
-WasmModule['writeToConnection'] = function (connId, bufferPtr, length) {
+function writeToConnection (connId, bufferPtr, length) {
   const conn = connections.get(connId)
   if (!conn) return -1
 
@@ -59,7 +55,7 @@ WasmModule['writeToConnection'] = function (connId, bufferPtr, length) {
   return 0
 }
 
-WasmModule['readFromConnection'] = async function (connId, bufferPtr, length, outPtr) {
+async function readFromConnection (connId, bufferPtr, length, outPtr) {
   const conn = connections.get(connId)
   if (!conn) return -1
 
@@ -71,13 +67,13 @@ WasmModule['readFromConnection'] = async function (connId, bufferPtr, length, ou
   }
 
   let buf
-  // Emscripten doesn't support optional chaining
+  // Emscripten (or the tooling it uses, whatever) doesn't support optional chaining
   while (!(buf = conn.res && conn.res.read(length))) await new Promise((resolve) => setImmediate(resolve))
-  WasmModule.writeArrayToMemory(buf, bufferPtr)
+  Module.writeArrayToMemory(buf, bufferPtr)
   Atomics.store(GROWABLE_HEAP_I32(), outPtr >> 2, buf.length)
 }
 
-WasmModule['freeConnection'] = function (connId) {
+function freeConnection (connId) {
   const conn = connections.get(connId)
   if (conn) {
     connections.delete(connId)
@@ -85,30 +81,4 @@ WasmModule['freeConnection'] = function (connId) {
     conn.req.on('error', () => void 0)
     conn.req.destroy()
   }
-}
-
-WasmModule['allocString'] = function (str) {
-  const length = WasmModule.lengthBytesUTF8(str) + 1
-  const ptr = WasmModule._malloc(length)
-  WasmModule.stringToUTF8(str, ptr, length)
-  return ptr
-}
-
-WasmModule['allocDeferred'] = function () {
-  let resolve
-  const ptr = deferredId++
-  const promise = new Promise((r) => (resolve = r))
-  deferred.set(ptr, resolve)
-  return [ promise, ptr ]
-}
-
-WasmModule['invokeDeferred'] = function (ptr, ...args) {
-  const resolve = deferred.get(ptr)
-  if (!resolve) throw new Error('segmentation fault')
-  deferred.delete(ptr)
-  resolve(...args)
-}
-
-WasmModule['freeDeferred'] = function (ptr) {
-  return deferred.delete(ptr)
 }
