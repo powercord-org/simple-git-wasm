@@ -1,4 +1,3 @@
-##
 # Copyright (c) 2021 Cynthia K. Rey, All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -24,29 +23,26 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-EMCC_CACHE=.emcc-cache
-
-EMCC_FLAGS= --cache $(EMCC_CACHE) \
-	--pre-js src/interface/alloc.js \
-	--pre-js src/interface/http.js \
-	--post-js src/interface/exports.js \
+EMCC_FLAGS= -Wno-pthreads-mem-growth \
+	 --pre-js src/interface/alloc.js \
+	 --pre-js src/interface/http.js \
+	 --post-js src/interface/exports.js \
 	 -I libgit2/include \
 	 -s MODULARIZE \
-	 -s EXPORTED_RUNTIME_METHODS=FS,writeArrayToMemory,lengthBytesUTF8,stringToUTF8 \
+	 -s EXPORTED_RUNTIME_METHODS=writeArrayToMemory,lengthBytesUTF8,stringToUTF8 \
 	 -s ENVIRONMENT=node \
 	 -s ALLOW_MEMORY_GROWTH \
 	 -s EXPORT_NAME=WasmModule \
-	 -s PTHREAD_POOL_SIZE='Math.max(require("os").cpus.length - 1, 1)' \
+	 -s PTHREAD_POOL_SIZE='Math.max(require("os").cpus().length - 1, 1)' \
 	 -s PTHREAD_POOL_SIZE_STRICT=2 \
 	 -s TEXTDECODER=2 \
 	 -s MALLOC=emmalloc \
+	 -s SUPPORT_LONGJMP=0 \
 	 -pthread \
 	 -lnodefs.js \
-	 -lstrings.js \
 	 -o src/wasm/libgit.js \
 	 libgit2/build/libgit2.a \
-	 src/lib/main.c \
-	 -Wno-pthreads-mem-growth
+	 src/lib/main.c
 
 EMCC_DEBUG_FLAGS= -O0 -g3 \
 	 -s LLD_REPORT_UNDEFINED \
@@ -66,8 +62,7 @@ libgit2/build/libgit2.a:
 	# Build the lib
 	cd libgit2/build && emcmake cmake \
 		-DCMAKE_BUILD_TYPE=Release \
-		-DCMAKE_C_FLAGS="-Oz -pthread" \
-		-DSONAME=OFF \
+		-DCMAKE_C_FLAGS="-Oz -flto -pthread" \
 		-DBUILD_SHARED_LIBS=OFF \
 		-DBUILD_CLAR=OFF \
 		-DUSE_HTTPS=OFF \
@@ -89,4 +84,4 @@ debug: libgit2/build/libgit2.a
 .PHONY: clear
 clear:
 	rm -rf libgit2/build || true
-	emcc --cache $(EMCC_CACHE) --clear-cache
+	emcc --clear-cache

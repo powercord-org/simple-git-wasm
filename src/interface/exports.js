@@ -58,6 +58,7 @@ async function clone (repo, path) {
     _free(pathPtr)
     freeDeferred(deferredPtr)
     FS.unmount(path)
+    FS.rmdir(path)
   }
 
   // Invoke our function -- note: unless an error occurred, it is unsafe to free resources before the promise resolves
@@ -83,6 +84,7 @@ async function pull (path, force = false) {
     _free(pathPtr)
     freeDeferred(deferredPtr)
     FS.unmount(path)
+    FS.rmdir(path)
   }
 
   // Invoke our function -- note: unless an error occurred, it is unsafe to free resources before the promise resolves

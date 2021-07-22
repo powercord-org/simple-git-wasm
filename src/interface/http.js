@@ -25,12 +25,15 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+const nodeHttp = require('http')
+const nodeHttps = require('https')
+
 let connectionId = 0
 const connections = new Map()
 
 function createConnection (url, isPost) {
   const connId = connectionId++
-  const client = url.startsWith('https') ? require('https') : require('http')
+  const client = url.startsWith('https') ? nodeHttps : nodeHttp
   const headers = {}
   let method = 'GET'
 
@@ -69,8 +72,8 @@ async function readFromConnection (connId, bufferPtr, length, outPtr) {
   let buf
   // Emscripten (or the tooling it uses, whatever) doesn't support optional chaining
   while (!(buf = conn.res && conn.res.read(length))) await new Promise((resolve) => setImmediate(resolve))
-  Module.writeArrayToMemory(buf, bufferPtr)
-  Atomics.store(GROWABLE_HEAP_I32(), outPtr >> 2, buf.length)
+  writeArrayToMemory(buf, bufferPtr)
+  GROWABLE_HEAP_I32()[outPtr >> 2] = buf.length
 }
 
 function freeConnection (connId) {

@@ -27,6 +27,7 @@
 
 #include <emscripten.h>
 #include <pthread.h>
+#include <time.h>
 
 #include <git2/global.h>
 #include <git2/clone.h>
@@ -38,7 +39,7 @@
 #include <git2/oid.h>
 
 // libgit2 doesn't support shallow clone -- see https://github.com/libgit2/libgit2/issues/3058
-// note: a patch to libgit is necessary to get this to compile -- see https://github.com/libgit2/libgit2/pull/5935
+// note: a patch to libgit is necessary to get clone to work -- see https://github.com/libgit2/libgit2/pull/5935
 
 #define UNUSED(X) (void)(X)
 #define RESOLVE(PTR, RET) MAIN_THREAD_ASYNC_EM_ASM({ invokeDeferred($0, $1); }, PTR, RET)
@@ -63,14 +64,6 @@ static int _extract_oid(const char* ref_name, const char* remote_url, const git_
   return 0;
 }
 
-EM_JS(char*, get_message, (), {
-  const date = new Date().toString() + ": simple-git-wasm: changes before pull";
-  const size = lengthBytesUTF8(date) + 1;
-  const ptr = _malloc(size);
-  stringToUTF8(date, ptr, size);
-  return ptr;
-});
-
 static int update_submodules(git_repository* repo) {
   int ret = 0;
   git_submodule_update_options submodule_options;
@@ -87,7 +80,13 @@ static int stash_changes(git_repository* repo) {
   ret = git_signature_now(&signature, "simple-git-wasm", "none@example.com");
   if (ret < 0) return ret;
 
-  char* message = get_message();
+  // Get message
+  time_t t = time(NULL);
+  struct tm* tm = localtime(&t);
+  char* message = malloc(64);
+  strftime(message, 64, "[%d/%m/%y %H:%M:%S] simple-git-wasm: changes before pull", tm);
+
+  // Stash changes
   ret = git_stash_save(&stashid, repo, signature, message, GIT_STASH_DEFAULT);
 	git_signature_free(signature);
   free(message);

@@ -35,8 +35,6 @@ async function getLibgit () {
   return libgitPromise
 }
 
-// todo: allow enforcing signed commits
-// todo: add an integrity check for github repos
 async function clone (repo, path) {
   const libgit = await getLibgit()
   const ret = libgit.clone(repo, resolve(path))
@@ -44,8 +42,6 @@ async function clone (repo, path) {
   return ret
 }
 
-// todo: allow enforcing signed commits
-// todo: add an integrity check for github repos
 async function pull (path, force = false) {
   const libgit = await getLibgit()
   const ret = libgit.pull(resolve(path), force)

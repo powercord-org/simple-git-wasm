@@ -1,5 +1,4 @@
 .vscode
-.emcc-cache
 src/wasm
 *.nogit/
 *.nogit.*

@@ -47,9 +47,6 @@ typedef struct { git_smart_subtransport_stream parent; const char* service_url; 
 static int emhttp_connection_read(int connId, const char* buf, size_t len) {
   int bytes_read = -2;
   MAIN_THREAD_ASYNC_EM_ASM({ readFromConnection($0, $1, $2, $3) }, connId, buf, len, &bytes_read);
-
-  // [Cynthia] Sync notes: we can safely lock the thread, as in our case this will never run in the main thread.
-  // The HTTP request will happen in the main thread, safe from any kind of event loop lock.
   while (bytes_read == -2) { usleep(10); }
   return bytes_read;
 }
