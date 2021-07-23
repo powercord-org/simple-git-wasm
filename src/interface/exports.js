@@ -25,8 +25,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-const { existsSync } = require('fs')
-const { mkdir } = require('fs/promises')
+const { existsSync, promises: { mkdir } } = require('fs')
 
 // This is needed because of issues with NODERAWFS in emscripten
 // See: https://github.com/emscripten-core/emscripten/issues/7487

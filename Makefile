@@ -75,6 +75,8 @@ libgit2/build/libgit2.a:
 build: libgit2/build/libgit2.a
 	rm -rf src/wasm && mkdir src/wasm
 	emcc $(EMCC_FLAGS) $(EMCC_BUILD_FLAGS)
+	# Ensure we get no surprises if this lib is used in Electron
+	sed -i "s/require(\"fs\")/require(process.versions.electron ? \"original-fs\" : \"fs\")/g" src/wasm/libgit.js src/wasm/libgit.worker.js
 
 .PHONY: debug
 debug: libgit2/build/libgit2.a
