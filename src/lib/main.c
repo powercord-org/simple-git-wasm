@@ -262,50 +262,50 @@ list_end:
 
 EMSCRIPTEN_KEEPALIVE
 int clone(char* repository, char* path, int resolve_ptr) {
+  int ret;
   pthread_t pid;
   clone_payload* payload;
 
   payload = malloc(sizeof(clone_payload));
-  if (payload == NULL) return -1;
   payload->repository = repository;
   payload->path = path;
   payload->resolve_ptr = resolve_ptr;
 
-  pthread_create(&pid, NULL, clone_repository, (void*) payload);
-  pthread_detach(pid);
+  ERR_CHECK(pthread_create(&pid, NULL, clone_repository, (void*) payload));
+  ERR_CHECK(pthread_detach(pid));
   return 0;
 }
 
 EMSCRIPTEN_KEEPALIVE
 int pull(char* path, int skip_fetch, int force, int resolve_ptr) {
+  int ret;
   pthread_t pid;
   pull_payload* payload;
 
   payload = malloc(sizeof(pull_payload));
-  if (payload == NULL) return -1;
   payload->path = path;
   payload->skip_fetch = skip_fetch;
   payload->force = force;
   payload->resolve_ptr = resolve_ptr;
 
-  pthread_create(&pid, NULL, pull_repository, (void*) payload);
-  pthread_detach(pid);
+  ERR_CHECK(pthread_create(&pid, NULL, pull_repository, (void*) payload));
+  ERR_CHECK(pthread_detach(pid));
   return 0;
 }
 
 EMSCRIPTEN_KEEPALIVE
 int list_updates(char* path, int ret_ptr, int resolve_ptr) {
+  int ret;
   pthread_t pid;
   list_updates_payload* payload;
 
   payload = malloc(sizeof(list_updates_payload));
-  if (payload == NULL) return -1;
   payload->path = path;
   payload->ret_ptr = ret_ptr;
   payload->resolve_ptr = resolve_ptr;
 
-  pthread_create(&pid, NULL, list_repository_updates, (void*) payload);
-  pthread_detach(pid);
+  ERR_CHECK(pthread_create(&pid, NULL, list_repository_updates, (void*) payload));
+  ERR_CHECK(pthread_detach(pid));
   return 0;
 }
 
