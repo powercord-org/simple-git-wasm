@@ -99,5 +99,33 @@ async function pull (path, force = false) {
   return res
 }
 
+async function listUpdates (path) {
+  path = await setupFs(path)
+
+  // Alloc stuff
+  const pathPtr = allocString(path)
+  const [ promise, deferredPtr ] = allocDeferred()
+  const [ ret, retPtr ] = allocArray()
+  function freeResources () {
+    _free(pathPtr)
+    freeDeferred(deferredPtr)
+    freeArray(retPtr)
+    FS.unmount(path)
+    FS.rmdir(path)
+  }
+
+  // Invoke our function -- note: unless an error occurred, it is unsafe to free resources before the promise resolves
+  let res = _list_updates(pathPtr, retPtr, deferredPtr)
+  if (res < 0) {
+    freeResources()
+    throw new Error('Failed to initialize git thread')
+  }
+
+  res = await promise
+  freeResources()
+  return res == 0 ? ret : null
+}
+
 Module['clone'] = clone
 Module['pull'] = pull
+Module['listUpdates'] = listUpdates

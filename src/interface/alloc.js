@@ -33,22 +33,41 @@ function allocString (str) {
 }
 
 let deferredId = 0
-const deferred = new Map()
+const deferredMap = new Map()
 function allocDeferred () {
   let resolve
   const ptr = deferredId++
   const promise = new Promise((r) => (resolve = r))
-  deferred.set(ptr, resolve)
+  deferredMap.set(ptr, resolve)
   return [ promise, ptr ]
 }
 
 function invokeDeferred (ptr, ...args) {
-  const resolve = deferred.get(ptr)
+  const resolve = deferredMap.get(ptr)
   if (!resolve) throw new Error('segmentation fault')
-  deferred.delete(ptr)
+  deferredMap.delete(ptr)
   resolve(...args)
 }
 
 function freeDeferred (ptr) {
-  return deferred.delete(ptr)
+  return deferredMap.delete(ptr)
+}
+
+let arrayId = 0
+const arrayMap = new Map()
+function allocArray () {
+  const ptr = arrayId++
+  const array = []
+  arrayMap.set(ptr, array)
+  return [ array, ptr ]
+}
+
+function arrayPush (ptr, ...data) {
+  const array = arrayMap.get(ptr)
+  if (!array) throw new Error('segmentation fault')
+  array.push(...data)
+}
+
+function freeArray (ptr) {
+  return arrayMap.delete(ptr)
 }

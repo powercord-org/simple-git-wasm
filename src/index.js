@@ -49,9 +49,22 @@ async function pull (path, force = false) {
   return ret
 }
 
-// todo: function to get new remote commits (+ signature status)
+async function listUpdates (path, force = false) {
+  const libgit = await getLibgit()
+  const updates = await libgit.listUpdates(resolve(path), force)
+  const res = []
+  for (let i = 0; i < updates.length;) {
+    res.push({
+      message: updates[i++],
+      author: updates[i++]
+    })
+  }
+
+  return res
+}
 
 module.exports = {
-  clone,
-  pull
+  clone: clone,
+  pull: pull,
+  listUpdates: listUpdates,
 }

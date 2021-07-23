@@ -69,7 +69,7 @@ libgit2/build/libgit2.a:
 		-DUSE_SSH=OFF \
 		-DREGEX_BACKEND=regcomp \
 		..
-	cd libgit2/build && emmake make -j
+	cd libgit2/build && emmake make -j4
 
 .PHONY: build
 build: libgit2/build/libgit2.a

@@ -37,15 +37,18 @@
 #include <git2/remote.h>
 #include <git2/stash.h>
 #include <git2/oid.h>
+#include <git2/revwalk.h>
+#include <git2/commit.h>
 
 // libgit2 doesn't support shallow clone -- see https://github.com/libgit2/libgit2/issues/3058
 // note: a patch to libgit is necessary to get clone to work -- see https://github.com/libgit2/libgit2/pull/5935
 
 #define UNUSED(X) (void)(X)
-#define RESOLVE(PTR, RET) MAIN_THREAD_ASYNC_EM_ASM({ invokeDeferred($0, $1); }, PTR, RET)
+#define RESOLVE(PTR, RET) MAIN_THREAD_EM_ASM({ invokeDeferred($0, $1); }, PTR, RET)
 
 typedef struct { char* repository; char* path; int resolve_ptr; } clone_payload;
 typedef struct { char* path; int force; int resolve_ptr; } pull_payload;
+typedef struct { char* path; int ret_ptr; int resolve_ptr; } list_updates_payload;
 
 static int _process_submodule(git_submodule* submodule, const char* name, void* payload) {
   git_submodule_update_options* options = (git_submodule_update_options*) payload;
@@ -60,7 +63,10 @@ static int _process_submodule(git_submodule* submodule, const char* name, void* 
 static int _extract_oid(const char* ref_name, const char* remote_url, const git_oid* oid, unsigned int is_merge, void* payload) {
   UNUSED(ref_name);
   UNUSED(remote_url);
-  if (is_merge) git_oid_cpy((git_oid*) payload, oid);
+  if (is_merge) {
+    git_oid_cpy((git_oid*) payload, oid);
+    return 1;
+  }
   return 0;
 }
 
@@ -91,6 +97,24 @@ static int stash_changes(git_repository* repo) {
 	git_signature_free(signature);
   free(message);
   return ret;
+}
+
+static void get_short_commit_message(const git_commit* commit, char* buf) {
+  const char* msg = git_commit_message_raw(commit);
+  int i;
+
+  for (i = 0; i < 70; i++) {
+    if (msg[i] == '\n') break;
+    buf[i] = msg[i];
+  }
+
+  if (i == 70 && msg[i] != '\n') {
+    buf[i++] = (char) 226;
+    buf[i++] = (char) 128;
+    buf[i++] = (char) 166;
+  }
+
+  buf[i] = '\0';
 }
 
 static void* clone_repository(void* payload) {
@@ -140,7 +164,7 @@ static void* pull_repository(void* payload) {
   ret = git_remote_lookup(&remote, repo, "origin");
   if (ret < 0) goto pull_end;
 
-  // Update FETCH_HEAD
+  // Update FETCH_HEAD -- todo: add an option to disable this step (not needed in pwc)
   git_fetch_options_init(&fetch_options, GIT_FETCH_OPTIONS_VERSION);
   ret = git_remote_fetch(remote, NULL, &fetch_options, NULL);
   if (ret < 0) goto pull_end;
@@ -181,6 +205,77 @@ pull_end:
   return NULL;
 }
 
+void* list_repository_updates(void* payload) {
+  int ret = 0;
+  int entries;
+  git_repository* repo;
+  git_remote* remote;
+  git_revwalk* walker;
+  git_oid local_oid;
+  git_oid remote_oid;
+
+  git_fetch_options fetch_options;
+  list_updates_payload* opts = (list_updates_payload*) payload;
+
+  ret = git_repository_open(&repo, opts->path);
+  if (ret < 0) goto list_end;
+
+  // Lookup the remote
+  ret = git_remote_lookup(&remote, repo, "origin");
+  if (ret < 0) goto list_end;
+
+  // Update FETCH_HEAD
+  git_fetch_options_init(&fetch_options, GIT_FETCH_OPTIONS_VERSION);
+  ret = git_remote_fetch(remote, NULL, &fetch_options, NULL);
+  if (ret < 0) goto list_end;
+
+  // Lookup OIDs
+  ret = git_reference_name_to_id(&local_oid, repo, "HEAD");
+  if (ret < 0) goto list_end;
+
+  ret = git_repository_fetchhead_foreach(repo, _extract_oid, &remote_oid);
+  if (ret < 0) goto list_end;
+
+  // Setup walker
+  ret = git_revwalk_new(&walker, repo);
+  if (ret < 0) goto list_end;
+
+  ret = git_revwalk_push(walker, &remote_oid);
+  if (ret < 0) goto list_end;
+
+  ret = git_revwalk_sorting(walker, GIT_SORT_TIME & GIT_SORT_REVERSE);
+  if (ret < 0) goto list_end;
+
+  // Walk through commits
+  git_oid oid;
+  git_commit* commit;
+  while (git_revwalk_next(&oid, walker) == 0) {
+    if (git_oid_cmp(&oid, &local_oid) == 0) break;
+
+    ret = git_commit_lookup(&commit, repo, &oid);
+    if (ret < 0) goto list_end;
+
+    char* message = malloc(74);
+    get_short_commit_message(commit, message);
+
+    char* author;
+    author = git_commit_author(commit)->name;
+
+    MAIN_THREAD_EM_ASM({ arrayPush($0, UTF8ToString($1), UTF8ToString($2)) }, opts->ret_ptr, message, author);
+    git_commit_free(commit);
+    free(message);
+  }
+
+list_end:
+  // Cleanup & return
+  git_revwalk_free(walker);
+  git_remote_free(remote);
+  git_repository_free(repo);
+  RESOLVE(opts->resolve_ptr, ret);
+  free(payload);
+  return NULL;
+}
+
 EMSCRIPTEN_KEEPALIVE
 int clone(char* repository, char* path, int resolve_ptr) {
   pthread_t pid;
@@ -209,6 +304,22 @@ int pull(char* path, int force, int resolve_ptr) {
   payload->resolve_ptr = resolve_ptr;
 
   pthread_create(&pid, NULL, pull_repository, (void*) payload);
+  pthread_detach(pid);
+  return 0;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int list_updates(char* path, int ret_ptr, int resolve_ptr) {
+  pthread_t pid;
+  list_updates_payload* payload;
+
+  payload = malloc(sizeof(list_updates_payload));
+  if (payload == NULL) return -1;
+  payload->path = path;
+  payload->ret_ptr = ret_ptr;
+  payload->resolve_ptr = resolve_ptr;
+
+  pthread_create(&pid, NULL, list_repository_updates, (void*) payload);
   pthread_detach(pid);
   return 0;
 }
