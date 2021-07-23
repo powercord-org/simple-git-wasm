@@ -37,14 +37,14 @@ async function getLibgit () {
 
 async function clone (repo, path) {
   const libgit = await getLibgit()
-  const ret = libgit.clone(repo, resolve(path))
+  const ret = await libgit.clone(repo, resolve(path))
   // todo: process ret and throw/return based on it
   return ret
 }
 
-async function pull (path, force = false) {
+async function pull (path, skipFetch = false, force = false) {
   const libgit = await getLibgit()
-  const ret = libgit.pull(resolve(path), force)
+  const ret = await libgit.pull(resolve(path), skipFetch, force)
   // todo: process ret and throw/return based on it
   return ret
 }

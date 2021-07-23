@@ -47,7 +47,7 @@
 #define RESOLVE(PTR, RET) MAIN_THREAD_EM_ASM({ invokeDeferred($0, $1); }, PTR, RET)
 
 typedef struct { char* repository; char* path; int resolve_ptr; } clone_payload;
-typedef struct { char* path; int force; int resolve_ptr; } pull_payload;
+typedef struct { char* path; int skip_fetch; int force; int resolve_ptr; } pull_payload;
 typedef struct { char* path; int ret_ptr; int resolve_ptr; } list_updates_payload;
 
 static int _process_submodule(git_submodule* submodule, const char* name, void* payload) {
@@ -164,10 +164,12 @@ static void* pull_repository(void* payload) {
   ret = git_remote_lookup(&remote, repo, "origin");
   if (ret < 0) goto pull_end;
 
-  // Update FETCH_HEAD -- todo: add an option to disable this step (not needed in pwc)
-  git_fetch_options_init(&fetch_options, GIT_FETCH_OPTIONS_VERSION);
-  ret = git_remote_fetch(remote, NULL, &fetch_options, NULL);
-  if (ret < 0) goto pull_end;
+  if (opts->skip_fetch == 0) {
+    // Update FETCH_HEAD
+    git_fetch_options_init(&fetch_options, GIT_FETCH_OPTIONS_VERSION);
+    ret = git_remote_fetch(remote, NULL, &fetch_options, NULL);
+    if (ret < 0) goto pull_end;
+  }
 
   // Find out the object id to merge
   ret = git_repository_fetchhead_foreach(repo, _extract_oid, &oid);
@@ -293,13 +295,14 @@ int clone(char* repository, char* path, int resolve_ptr) {
 }
 
 EMSCRIPTEN_KEEPALIVE
-int pull(char* path, int force, int resolve_ptr) {
+int pull(char* path, int skip_fetch, int force, int resolve_ptr) {
   pthread_t pid;
   pull_payload* payload;
 
   payload = malloc(sizeof(pull_payload));
   if (payload == NULL) return -1;
   payload->path = path;
+  payload->skip_fetch = skip_fetch;
   payload->force = force;
   payload->resolve_ptr = resolve_ptr;
 
