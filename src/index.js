@@ -38,15 +38,21 @@ async function getLibgit () {
 async function clone (repo, path) {
   const libgit = await getLibgit()
   const ret = await libgit.clone(repo, resolve(path))
-  // todo: process ret and throw/return based on it
-  return ret
+  if (ret < 0) {
+    const error = new Error('failed to clone git repository')
+    error.code = ret
+    throw error
+  }
 }
 
 async function pull (path, skipFetch = false, force = false) {
   const libgit = await getLibgit()
   const ret = await libgit.pull(resolve(path), skipFetch, force)
-  // todo: process ret and throw/return based on it
-  return ret
+  if (ret < 0) {
+    const error = new Error('failed to clone git repository')
+    error.code = ret
+    throw error
+  }
 }
 
 async function listUpdates (path, force = false) {
