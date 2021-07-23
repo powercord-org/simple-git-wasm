@@ -1,0 +1,45 @@
+diff --git a/src/errors.c b/src/errors.c
+index 3d1d1c9a1..4bbcaf23b 100644
+--- a/src/errors.c
++++ b/src/errors.c
+@@ -55,7 +55,7 @@ void git_error_set_oom(void)
+ 	GIT_THREADSTATE->last_error = &g_git_oom_error;
+ }
+ 
+-void git_error_set(int error_class, const char *fmt, ...)
++void _git_error_set(int error_class, const char *fmt, ...)
+ {
+ 	va_list ap;
+ 
+@@ -64,7 +64,7 @@ void git_error_set(int error_class, const char *fmt, ...)
+ 	va_end(ap);
+ }
+ 
+-void git_error_vset(int error_class, const char *fmt, va_list ap)
++void _git_error_vset(int error_class, const char *fmt, va_list ap)
+ {
+ #ifdef GIT_WIN32
+ 	DWORD win32_error_code = (error_class == GIT_ERROR_OS) ? GetLastError() : 0;
+@@ -241,3 +241,5 @@ void giterr_set_oom(void)
+ 	git_error_set_oom();
+ }
+ #endif
++#define git_error_set(...)
++#define git_error_vset(...)
+diff --git a/src/errors.h b/src/errors.h
+index a2f60f752..79199950f 100644
+--- a/src/errors.h
++++ b/src/errors.h
+@@ -13,8 +13,10 @@
+ /*
+  * Set the error message for this thread, formatting as needed.
+  */
+-void git_error_set(int error_class, const char *fmt, ...) GIT_FORMAT_PRINTF(2, 3);
+-void git_error_vset(int error_class, const char *fmt, va_list ap);
++void _git_error_set(int error_class, const char *fmt, ...) GIT_FORMAT_PRINTF(2, 3);
++void _git_error_vset(int error_class, const char *fmt, va_list ap);
++#define git_error_set(...)
++#define git_error_vset(...)
+ 
+ /**
+  * Set error message for user callback if needed.

@@ -51,13 +51,18 @@ EMCC_DEBUG_FLAGS= -O0 -g3 \
 EMCC_BUILD_FLAGS= -Oz -flto --closure 1 -s USE_CLOSURE_COMPILER
 
 libgit2/build/libgit2.a:
-	# Work folder
 	mkdir libgit2/build || true
+	cd libgit2 && git reset --hard
 
-	# Some patching
+	# We don't use git errors, yet they take 60k+ of the total binary size
+	cd libgit2 && git apply ../lg2-no-errors.patch
+
+	# Use our own HTTP transport
 	rm libgit2/src/transports/http.c || true
 	ln -s ../../../src/lib/http.c libgit2/src/transports/http.c
-	sed -i "s/_FILE_MODE 0444/_FILE_MODE 0644/g" libgit2/src/pack.h libgit2/src/odb.h # Permission issues with NODEFS
+
+	# Fix permission issues with NODEFS
+	sed -i "s/_FILE_MODE 0444/_FILE_MODE 0644/g" libgit2/src/pack.h libgit2/src/odb.h
 
 	# Build the lib
 	cd libgit2/build && emcmake cmake \
