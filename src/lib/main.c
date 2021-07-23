@@ -46,6 +46,12 @@
 #define UNUSED(X) (void)(X)
 #define RESOLVE(PTR, RET) MAIN_THREAD_EM_ASM({ invokeDeferred($0, $1); }, PTR, RET)
 
+// Funni macros
+#define ERR_CHECK_RET(FN) ret = FN; if (ret < 0) return ret
+#define ERR_CHECK_LAB(FN, L) ret = FN; if (ret < 0) goto L
+#define ERR_CHECK_GET(A, B, C, ...) C
+#define ERR_CHECK(...) ERR_CHECK_GET(__VA_ARGS__, ERR_CHECK_LAB, ERR_CHECK_RET)(__VA_ARGS__)
+
 typedef struct { char* repository; char* path; int resolve_ptr; } clone_payload;
 typedef struct { char* path; int skip_fetch; int force; int resolve_ptr; } pull_payload;
 typedef struct { char* path; int ret_ptr; int resolve_ptr; } list_updates_payload;
@@ -83,8 +89,7 @@ static int stash_changes(git_repository* repo) {
   git_signature* signature;
   git_oid stashid;
 
-  ret = git_signature_now(&signature, "simple-git-wasm", "none@example.com");
-  if (ret < 0) return ret;
+  ERR_CHECK(git_signature_now(&signature, "simple-git-wasm", "none@example.com"));
 
   // Get message
   time_t t = time(NULL);
@@ -126,9 +131,7 @@ static void* clone_repository(void* payload) {
   git_clone_options_init(&clone_options, GIT_CLONE_OPTIONS_VERSION);
   clone_options.fetch_opts.download_tags = GIT_REMOTE_DOWNLOAD_TAGS_NONE;
 
-  ret = git_clone(&repo, opts->repository, opts->path, NULL);
-  if (ret < 0) goto clone_end;
-
+  ERR_CHECK(git_clone(&repo, opts->repository, opts->path, NULL), clone_end);
   ret = update_submodules(repo);
 clone_end:
   git_repository_free(repo);
@@ -150,48 +153,39 @@ static void* pull_repository(void* payload) {
   git_checkout_options checkout_options;
   pull_payload* opts = (pull_payload*) payload;
 
-  ret = git_repository_open(&repo, opts->path);
-  if (ret < 0) goto pull_end;
+  ERR_CHECK(git_repository_open(&repo, opts->path), pull_end);
 
   if (opts->force) {
     // [Cynthia] Design choice from Powercord here; force-pull = discard all local changes.
     // We used to reset --hard, here we stash the local changes so they aren't completely lost.
-    ret = stash_changes(repo);
-    if (ret < 0) goto pull_end;
+    ERR_CHECK(stash_changes(repo), pull_end);
   }
 
   // Lookup the remote
-  ret = git_remote_lookup(&remote, repo, "origin");
-  if (ret < 0) goto pull_end;
+  ERR_CHECK(git_remote_lookup(&remote, repo, "origin"), pull_end);
 
   if (opts->skip_fetch == 0) {
     // Update FETCH_HEAD
     git_fetch_options_init(&fetch_options, GIT_FETCH_OPTIONS_VERSION);
-    ret = git_remote_fetch(remote, NULL, &fetch_options, NULL);
-    if (ret < 0) goto pull_end;
+    ERR_CHECK(git_remote_fetch(remote, NULL, &fetch_options, NULL), pull_end);
   }
 
   // Find out the object id to merge
-  ret = git_repository_fetchhead_foreach(repo, _extract_oid, &oid);
-  if (ret < 0) goto pull_end;
+  ERR_CHECK(git_repository_fetchhead_foreach(repo, _extract_oid, &oid), pull_end);
 
   // Retrieve current reference
-  ret = git_repository_head(&ref_current, repo);
-  if (ret < 0) goto pull_end;
+  ERR_CHECK(git_repository_head(&ref_current, repo), pull_end);
 
   // Lookup target object
-  ret = git_object_lookup(&target, repo, &oid, GIT_OBJECT_COMMIT);
-  if (ret < 0) goto pull_end;
+  ERR_CHECK(git_object_lookup(&target, repo, &oid, GIT_OBJECT_COMMIT), pull_end);
 
   // Fast-forward checkout
   git_checkout_options_init(&checkout_options, GIT_CHECKOUT_OPTIONS_VERSION);
   checkout_options.checkout_strategy = GIT_CHECKOUT_SAFE;
-  ret = git_checkout_tree(repo, target, &checkout_options);
-  if (ret < 0) goto pull_end;
+  ERR_CHECK(git_checkout_tree(repo, target, &checkout_options), pull_end);
 
   // Move references
-  ret = git_reference_set_target(&ref_updated, ref_current, &oid, NULL);
-  if (ret < 0) goto pull_end;
+  ERR_CHECK(git_reference_set_target(&ref_updated, ref_current, &oid, NULL), pull_end);
 
   // Update submodules
   ret = update_submodules(repo);
@@ -219,34 +213,23 @@ void* list_repository_updates(void* payload) {
   git_fetch_options fetch_options;
   list_updates_payload* opts = (list_updates_payload*) payload;
 
-  ret = git_repository_open(&repo, opts->path);
-  if (ret < 0) goto list_end;
+  ERR_CHECK(git_repository_open(&repo, opts->path), list_end);
 
   // Lookup the remote
-  ret = git_remote_lookup(&remote, repo, "origin");
-  if (ret < 0) goto list_end;
+  ERR_CHECK(git_remote_lookup(&remote, repo, "origin"), list_end);
 
   // Update FETCH_HEAD
   git_fetch_options_init(&fetch_options, GIT_FETCH_OPTIONS_VERSION);
-  ret = git_remote_fetch(remote, NULL, &fetch_options, NULL);
-  if (ret < 0) goto list_end;
+  ERR_CHECK(git_remote_fetch(remote, NULL, &fetch_options, NULL), list_end);
 
   // Lookup OIDs
-  ret = git_reference_name_to_id(&local_oid, repo, "HEAD");
-  if (ret < 0) goto list_end;
-
-  ret = git_repository_fetchhead_foreach(repo, _extract_oid, &remote_oid);
-  if (ret < 0) goto list_end;
+  ERR_CHECK(git_reference_name_to_id(&local_oid, repo, "HEAD"), list_end);
+  ERR_CHECK(git_repository_fetchhead_foreach(repo, _extract_oid, &remote_oid), list_end);
 
   // Setup walker
-  ret = git_revwalk_new(&walker, repo);
-  if (ret < 0) goto list_end;
-
-  ret = git_revwalk_push(walker, &remote_oid);
-  if (ret < 0) goto list_end;
-
-  ret = git_revwalk_sorting(walker, GIT_SORT_TIME & GIT_SORT_REVERSE);
-  if (ret < 0) goto list_end;
+  ERR_CHECK(git_revwalk_new(&walker, repo), list_end);
+  ERR_CHECK(git_revwalk_push(walker, &remote_oid), list_end);
+  ERR_CHECK(git_revwalk_sorting(walker, GIT_SORT_TIME & GIT_SORT_REVERSE), list_end);
 
   // Walk through commits
   git_oid oid;
@@ -254,8 +237,7 @@ void* list_repository_updates(void* payload) {
   while (git_revwalk_next(&oid, walker) == 0) {
     if (git_oid_cmp(&oid, &local_oid) == 0) break;
 
-    ret = git_commit_lookup(&commit, repo, &oid);
-    if (ret < 0) goto list_end;
+    ERR_CHECK(git_commit_lookup(&commit, repo, &oid), list_end);
 
     char* message = malloc(74);
     get_short_commit_message(commit, message);
