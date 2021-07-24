@@ -12,6 +12,52 @@ beast, and [wasm-git](https://github.com/petersalomonsen/wasm-git) is too raw fo
 Makes my software sweeter. It also doesn't support things it cannot support because of its target (I only care
 about Node, so I can make different design choices).
 
+## Usage
+Installation:
+```
+[pnpm | yarn | npm] i @powercord/simple-git-wasm
+```
+
+### Clone a repository
+**Note**: Submodules will be cloned as well.
+```js
+const sgw = require('@powercord/simple-git-wasm')
+
+try {
+  await sgw.clone('https://github.com/powercord-org/simple-git-wasm', './sgw')
+} catch (e) {
+  console.error('An error occurred while cloning the repository!')
+}
+```
+### Pull a repository
+**Note**: Submodules will be updated if necessary.
+```js
+const sgw = require('@powercord/simple-git-wasm')
+
+try {
+  await sgw.pull('./sgw')
+} catch (e) {
+  console.error('An error occurred while pulling the repository!')
+}
+```
+
+### Check for updates (new commits)
+```js
+const sgw = require('@powercord/simple-git-wasm')
+
+try {
+  const updates = await sgw.listUpdates('./sgw')
+  console.log(updates)
+  // ~> [
+  // ~>   { message: 'This is the newest commit', author: 'Cynthia' },
+  // ~>   { message: 'This is a new commit', author: 'Cynthia' },
+  // ~>   { message: 'This is the oldest new commit', author: 'Cynthia' },
+  // ~> ]
+} catch (e) {
+  console.error('An error occurred while pulling the repository!')
+}
+```
+
 ## Notes
 The following PRs are required for this to work:
  - https://github.com/libgit2/libgit2/pull/5935
