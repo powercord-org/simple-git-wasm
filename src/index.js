@@ -27,6 +27,7 @@
 
 const { resolve } = require('path')
 const libgitFactory = require('./wasm/libgit.js')
+const config = require('./config.js')
 
 let libgitPromise
 async function getLibgit () {
@@ -69,7 +70,7 @@ async function listUpdates (path, force = false) {
   for (let i = 0; i < res.length;) {
     updates.push({
       message: res[i++],
-      author: res[i++]
+      author: res[i++],
     })
   }
 
@@ -80,4 +81,5 @@ module.exports = {
   clone: clone,
   pull: pull,
   listUpdates: listUpdates,
+  ...config,
 }
