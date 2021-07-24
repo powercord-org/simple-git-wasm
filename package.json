@@ -13,5 +13,11 @@
   },
   "devDependencies": {
     "eslint": "^7.24.0"
+  },
+  "exports": {
+    ".": {
+      "default": "./src/index.js",
+      "types": "./index.d.ts"
+    }
   }
 }

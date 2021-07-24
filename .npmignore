@@ -1,0 +1,9 @@
+.vscode
+patches
+src/lib
+src/interface
+libgit2
+.gitmodules
+Makefile
+*.nogit/
+*.nogit.*

@@ -55,9 +55,9 @@ libgit2/build/libgit2.a:
 	cd libgit2 && git reset --hard
 
 	# Patches to reduce weight of the final binary & some fixes
-	cd libgit2 && git apply ../lg2-no-errors.patch
-	cd libgit2 && git apply ../lg2-no-filename.patch
-	cd libgit2 && git apply ../lg2-fix-permissions-nodefs.patch
+	cd libgit2 && git apply ../patches/lg2-no-errors.patch
+	cd libgit2 && git apply ../patches/lg2-no-filename.patch
+	cd libgit2 && git apply ../patches/lg2-fix-permissions-nodefs.patch
 
 	# Use our own HTTP transport
 	rm libgit2/src/transports/http.c || true
