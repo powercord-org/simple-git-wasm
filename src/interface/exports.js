@@ -25,7 +25,12 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-const { existsSync, promises: { mkdir } } = require('fs')
+const nodeFs = require('fs')
+
+/* eslint-disable dot-notation */
+const existsSync = nodeFs['existsSync']
+const mkdir = nodeFs['promises']['mkdir']
+/* eslint-enable dot-notation */
 
 async function mount (path) {
   if (!existsSync(path)) await mkdir(path)
@@ -51,13 +56,14 @@ function free (allocated) {
   }
 }
 
-function makeWrapper (method) {
+function makeWrapper (method, returns = false) {
   return async function (...rawArgs) {
     // Wait for an available worker
     while (!PThread.unusedWorkers.length) {
       await new Promise((resolve) => setImmediate(resolve))
     }
 
+    let ret = void 0
     const args = []
     const toFree = []
     const [ promise, deferredPtr ] = allocDeferred()
@@ -69,14 +75,13 @@ function makeWrapper (method) {
         continue
       }
 
-      if (Array.isArray(arg)) {
-        const ptr = allocArray(arg)
-        toFree.push([ ptr, true ])
-        args.push(ptr)
-        continue
-      }
-
       args.push(arg)
+    }
+
+    if (returns) {
+      const [ a, ptr ] = allocArray()
+      args.push(ptr)
+      ret = a
     }
 
     let res = Module[`_${method}`](...args, deferredPtr)
@@ -92,6 +97,8 @@ function makeWrapper (method) {
       error.code = res
       throw error
     }
+
+    return ret
   }
 }
 
@@ -100,4 +107,4 @@ Module['mount'] = mount
 Module['umount'] = umount
 Module['clone'] = makeWrapper('clone')
 Module['pull'] = makeWrapper('pull')
-Module['listUpdates'] = makeWrapper('list_updates')
+Module['listUpdates'] = makeWrapper('list_updates', true)

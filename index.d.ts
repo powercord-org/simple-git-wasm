@@ -26,7 +26,7 @@
  */
 
 declare module '@powercord/simple-git-wasm' {
-  export type Commit = { message: string, author: string }
+  export type Commit = { id: string, message: string, author: string }
 
   /**
    * Clones a repository in a specified path. Only HTTP(S) urls are supported.

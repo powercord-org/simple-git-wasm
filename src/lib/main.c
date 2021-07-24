@@ -245,7 +245,13 @@ void* list_repository_updates(void* payload) {
     char* author;
     author = git_commit_author(commit)->name;
 
-    MAIN_THREAD_EM_ASM({ arrayPush($0, UTF8ToString($1), UTF8ToString($2)) }, opts->ret_ptr, message, author);
+    MAIN_THREAD_EM_ASM(
+      { arrayPush($0, UTF8ToString($1), UTF8ToString($2), UTF8ToString($3)) },
+      opts->ret_ptr,
+      git_oid_tostr_s(&oid),
+      message,
+      author
+    );
     git_commit_free(commit);
     free(message);
   }

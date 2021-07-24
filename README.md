@@ -49,9 +49,9 @@ try {
   const updates = await sgw.listUpdates('./sgw')
   console.log(updates)
   // ~> [
-  // ~>   { message: 'This is the newest commit', author: 'Cynthia' },
-  // ~>   { message: 'This is a new commit', author: 'Cynthia' },
-  // ~>   { message: 'This is the oldest new commit', author: 'Cynthia' },
+  // ~>   { id: 'abcdef.....', message: 'This is the newest commit', author: 'Cynthia' },
+  // ~>   { id: 'abcdef.....', message: 'This is a new commit', author: 'Cynthia' },
+  // ~>   { id: 'abcdef.....', message: 'This is the oldest new commit', author: 'Cynthia' },
   // ~> ]
 } catch (e) {
   console.error('An error occurred while pulling the repository!')

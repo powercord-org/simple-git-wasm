@@ -77,14 +77,16 @@ libgit2/build/libgit2.a:
 
 .PHONY: build
 build: libgit2/build/libgit2.a
-	rm -rf src/wasm && mkdir src/wasm
+	rm -rf src/wasm || true
+	mkdir src/wasm
 	emcc $(EMCC_FLAGS) $(EMCC_BUILD_FLAGS)
 	# Ensure we get no surprises if this lib is used in Electron
 	sed -i "s/require(\"fs\")/require(process.versions.electron ? \"original-fs\" : \"fs\")/g" src/wasm/libgit.js src/wasm/libgit.worker.js
 
 .PHONY: debug
 debug: libgit2/build/libgit2.a
-	rm -rf src/wasm && mkdir src/wasm
+	rm -rf src/wasm || true
+	mkdir src/wasm
 	emcc $(EMCC_FLAGS) $(EMCC_DEBUG_FLAGS)
 
 .PHONY: clear

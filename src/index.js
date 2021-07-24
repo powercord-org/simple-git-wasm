@@ -38,7 +38,7 @@ async function getLibgit () {
 
 async function clone (repo, path) {
   const libgit = await getLibgit()
-  path = libgit.mount(resolve(path))
+  path = await libgit.mount(resolve(path))
   try {
     await libgit.clone(repo, path)
   } finally {
@@ -48,7 +48,7 @@ async function clone (repo, path) {
 
 async function pull (path, skipFetch = false, force = false) {
   const libgit = await getLibgit()
-  path = libgit.mount(resolve(path))
+  path = await libgit.mount(resolve(path))
   try {
     await libgit.pull(path, skipFetch, force)
   } finally {
@@ -58,10 +58,10 @@ async function pull (path, skipFetch = false, force = false) {
 
 async function listUpdates (path) {
   const libgit = await getLibgit()
-  path = libgit.mount(resolve(path))
+  path = await libgit.mount(resolve(path))
   let res
   try {
-    res = await libgit.pull(path, skipFetch, force)
+    res = await libgit.listUpdates(path)
   } finally {
     libgit.umount(path)
   }
@@ -69,6 +69,7 @@ async function listUpdates (path) {
   const updates = []
   for (let i = 0; i < res.length;) {
     updates.push({
+      id: res[i++],
       message: res[i++],
       author: res[i++],
     })

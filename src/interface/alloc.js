@@ -60,7 +60,8 @@ function freeDeferred (ptr) {
 let arrayId = 0
 const arrayMap = new Map()
 // eslint-disable-next-line no-unused-vars
-function allocArray (array) {
+function allocArray () {
+  const array = []
   const ptr = arrayId++
   arrayMap.set(ptr, array)
   return [ array, ptr ]
