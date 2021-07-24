@@ -51,7 +51,7 @@ function free (allocated) {
   }
 }
 
-function makeWrapper(method) {
+function makeWrapper (method) {
   return async function (...rawArgs) {
     // Wait for an available worker
     while (!PThread.unusedWorkers.length) {
@@ -95,6 +95,7 @@ function makeWrapper(method) {
   }
 }
 
+/* eslint-disable dot-notation */
 Module['mount'] = mount
 Module['umount'] = umount
 Module['clone'] = makeWrapper('clone')

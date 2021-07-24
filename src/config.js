@@ -31,8 +31,9 @@ const { readFile } = require('fs/promises')
 
 const LINE_RE = /\[([^ \]]+)(?: "([^"]+)")?]/i
 function parseGitConfig (blob) {
-  const cfg = {};
-  let key, subkey;
+  const cfg = {}
+  let key
+  let subkey
   for (const line of blob.split('\n').filter(Boolean)) {
     if (line.startsWith('[')) {
       [ , key, subkey ] = line.match(LINE_RE)
@@ -72,10 +73,10 @@ async function readRepositoryMeta (path) {
       upstream: null,
       revision: null,
       branch: branch,
-    };
+    }
   }
 
-  const localRevision = await readFile(localRef, 'utf8').then((ref) => ref.trim())
+  const localRevision = await readFile(localRef, 'utf8').then((lref) => lref.trim())
   const configBlob = await readFile(cfgFile, 'utf8')
   const config = parseGitConfig(configBlob)
   if (!config.branch?.[branch]?.remote || !config.remote?.[config.branch[branch].remote]) {
@@ -84,7 +85,7 @@ async function readRepositoryMeta (path) {
       upstream: null,
       revision: localRevision,
       branch: branch,
-    };
+    }
   }
 
   const { remote } = config.branch[branch]
@@ -103,4 +104,4 @@ async function readRepositoryMeta (path) {
   }
 }
 
-module.exports = { readRepositoryMeta }
+module.exports = { readRepositoryMeta: readRepositoryMeta }

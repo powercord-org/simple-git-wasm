@@ -2,3 +2,4 @@
 src/wasm
 *.nogit/
 *.nogit.*
+node_modules

@@ -25,6 +25,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+// eslint-disable-next-line no-unused-vars
 function allocString (str) {
   const length = lengthBytesUTF8(str) + 1
   const ptr = _malloc(length)
@@ -34,6 +35,7 @@ function allocString (str) {
 
 let deferredId = 0
 const deferredMap = new Map()
+// eslint-disable-next-line no-unused-vars
 function allocDeferred () {
   let resolve
   const ptr = deferredId++
@@ -42,6 +44,7 @@ function allocDeferred () {
   return [ promise, ptr ]
 }
 
+// eslint-disable-next-line no-unused-vars
 function invokeDeferred (ptr, ...args) {
   const resolve = deferredMap.get(ptr)
   if (!resolve) throw new Error('segmentation fault')
@@ -49,24 +52,28 @@ function invokeDeferred (ptr, ...args) {
   resolve(...args)
 }
 
+// eslint-disable-next-line no-unused-vars
 function freeDeferred (ptr) {
   return deferredMap.delete(ptr)
 }
 
 let arrayId = 0
 const arrayMap = new Map()
+// eslint-disable-next-line no-unused-vars
 function allocArray (array) {
   const ptr = arrayId++
   arrayMap.set(ptr, array)
   return [ array, ptr ]
 }
 
+// eslint-disable-next-line no-unused-vars
 function arrayPush (ptr, ...data) {
   const array = arrayMap.get(ptr)
   if (!array) throw new Error('segmentation fault')
   array.push(...data)
 }
 
+// eslint-disable-next-line no-unused-vars
 function freeArray (ptr) {
   return arrayMap.delete(ptr)
 }
