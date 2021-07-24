@@ -1,0 +1,26 @@
+diff --git a/src/odb.h b/src/odb.h
+index d71985668..2e638d538 100644
+--- a/src/odb.h
++++ b/src/odb.h
+@@ -20,7 +20,7 @@
+ 
+ #define GIT_OBJECTS_DIR "objects/"
+ #define GIT_OBJECT_DIR_MODE 0777
+-#define GIT_OBJECT_FILE_MODE 0444
++#define GIT_OBJECT_FILE_MODE 0644
+ 
+ extern bool git_odb__strict_hash_verification;
+ 
+diff --git a/src/pack.h b/src/pack.h
+index 1d077240d..8ea0886ff 100644
+--- a/src/pack.h
++++ b/src/pack.h
+@@ -20,7 +20,7 @@
+ #include "oidmap.h"
+ #include "zstream.h"
+ 
+-#define GIT_PACK_FILE_MODE 0444
++#define GIT_PACK_FILE_MODE 0644
+ 
+ #define PACK_SIGNATURE 0x5041434b	/* "PACK" */
+ #define PACK_VERSION 2

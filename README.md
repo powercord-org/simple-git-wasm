@@ -13,9 +13,9 @@ Makes my software sweeter. It also doesn't support things it cannot support beca
 about Node, so I can make different design choices).
 
 ## Notes
-For this to work, you need this PR to libgit2: https://github.com/libgit2/libgit2/pull/5935
+The following PRs are required for this to work:
+ - https://github.com/libgit2/libgit2/pull/5935
+ - https://github.com/emscripten-core/emscripten/pull/14722
 
-`make build` will produce a broken and heavier build than the published one due to these two issues:
- - https://github.com/emscripten-core/emscripten/issues/14705
-   - Fixed by https://github.com/emscripten-core/emscripten/pull/14722
- - https://github.com/emscripten-core/emscripten/issues/11805
+I (Cynthia) patched my Emscripten installation to strip things not needed but included in the final build.
+ - https://github.com/emscripten-core/emscripten/issues/11805 (patch in the comments)
