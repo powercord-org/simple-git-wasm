@@ -25,61 +25,27 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-const { resolve } = require('path')
-const libgitFactory = require('./wasm/libgit.js')
-const config = require('./config.js')
+declare module '@powercord/simple-git-wasm' {
+  export type Commit = { message: string, author: string }
 
-let libgitPromise
-async function getLibgit () {
-  // Lazily init the wasm binary when we need it
-  if (!libgitPromise) libgitPromise = libgitFactory()
-  return libgitPromise
-}
+  /**
+   * Clones a repository in a specified path. Only HTTP(S) urls are supported.
+   * @param repository the repository to clone.
+   * @param path destination path. must be an empty (or not yet existing) directory.
+   */
+  export async function clone (repository: string, path: string): Promise<void>
 
-async function clone (repo, path) {
-  const libgit = await getLibgit()
-  path = libgit.mount(resolve(path))
-  try {
-    await libgit.clone(repo, path)
-  } finally {
-    libgit.umount(path)
-  }
-}
+  /**
+   * Pulls new commits to a repository.
+   * @param path path where the repository resides.
+   * @param skipFetch set to true to pull the already fetched refs, not checking if there are new ones.
+   * @param force if a conflict happens, stash changes and pull on a clean working tree
+   */
+  export async function pull (path: string, skipFetch?: boolean, force?: boolean): Promise<void>
 
-async function pull (path, skipFetch = false, force = false) {
-  const libgit = await getLibgit()
-  path = libgit.mount(resolve(path))
-  try {
-    await libgit.pull(path, skipFetch, force)
-  } finally {
-    libgit.umount(path)
-  }
-}
-
-async function listUpdates (path) {
-  const libgit = await getLibgit()
-  path = libgit.mount(resolve(path))
-  let res
-  try {
-    res = await libgit.pull(path, skipFetch, force)
-  } finally {
-    libgit.umount(path)
-  }
-
-  const updates = []
-  for (let i = 0; i < res.length;) {
-    updates.push({
-      message: res[i++],
-      author: res[i++],
-    })
-  }
-
-  return updates
-}
-
-module.exports = {
-  clone: clone,
-  pull: pull,
-  listUpdates: listUpdates,
-  ...config,
+  /**
+   * Lists new updates (commits) to a repository. Performs a fetch.
+   * @param path path where the repository resides.
+   */
+  export async function listUpdates (path: string): Promise<Commit[]>
 }
