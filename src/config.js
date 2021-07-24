@@ -30,6 +30,8 @@ const { existsSync } = require('fs')
 const { readFile } = require('fs/promises')
 
 const LINE_RE = /\[([^ \]]+)(?: "([^"]+)")?]/i
+const GIT_URL_RE = /^(?:https?:\/\/[^/]+\/|[^@]+@[^:]+:)(.*?)(?:\.git)?$/
+
 function parseGitConfig (blob) {
   const cfg = {}
   let key
@@ -46,7 +48,7 @@ function parseGitConfig (blob) {
     let [ k, v ] = line.trim().split('=').map((s) => s.trim())
 
     if (v === 'true' || v === 'false') v = v === 'true'
-    if (v.match(/^\d+$/)) v = Number(v)
+    else if (v && v.match(/^\d+$/)) v = Number(v)
 
     target[k] = v
   }
@@ -90,7 +92,7 @@ async function readRepositoryMeta (path) {
 
   const { remote } = config.branch[branch]
   const upstreamUrl = config.remote[remote].url
-  const repo = upstreamUrl.match(/^(?:https?:\/\/[^/]+|[^@]+@[^:]+:)(.*?)(?:\.git)?$/)[1]
+  const repo = upstreamUrl.match(GIT_URL_RE)[1]
 
   return {
     branch: branch,

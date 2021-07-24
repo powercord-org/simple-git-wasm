@@ -27,6 +27,8 @@
 
 declare module '@powercord/simple-git-wasm' {
   export type Commit = { id: string, message: string, author: string }
+  export type Upstream = { name: string, url: string, repo: string }
+  export type RepositoryMeta = { detached: true } | { detached: false, branch: string, revision: string | null, upstream: Upstream | null }
 
   /**
    * Clones a repository in a specified path. Only HTTP(S) urls are supported.
@@ -44,8 +46,14 @@ declare module '@powercord/simple-git-wasm' {
   export async function pull (path: string, skipFetch?: boolean, force?: boolean): Promise<void>
 
   /**
-   * Lists new updates (commits) to a repository. Performs a fetch.
+   * Lists new updates (commits) to a repository. Note: performs a fetch (updates FETCH_HEAD).
    * @param path path where the repository resides.
    */
   export async function listUpdates (path: string): Promise<Commit[]>
+
+  /**
+   * Reads a repositorty's metadata (branch, revision, upstream).
+   * @param path path where the repository resides.
+   */
+  export async function readRepositoryMeta (path: string): Promise<RepositoryMeta | null>
 }

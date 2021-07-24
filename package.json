@@ -6,6 +6,7 @@
   "author": "Cynthia <cynthia@cynthia.dev>",
   "license": "BSD-3-Clause",
   "scripts": {
+    "prepublish": "make build",
     "lint": "eslint src"
   },
   "engines": {
