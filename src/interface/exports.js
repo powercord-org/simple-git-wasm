@@ -27,9 +27,7 @@
 
 const { existsSync, promises: { mkdir } } = require('fs')
 
-// This is needed because of issues with NODERAWFS in emscripten
-// See: https://github.com/emscripten-core/emscripten/issues/7487
-async function setupFs (path) {
+async function mount (path) {
   if (!existsSync(path)) await mkdir(path)
 
   const dir = Math.random().toString(16).slice(2)
@@ -38,93 +36,67 @@ async function setupFs (path) {
   return dir
 }
 
-async function awaitWorker () {
-  while (!PThread.unusedWorkers.length) {
-    await new Promise((resolve) => setImmediate(resolve))
+function umount (path) {
+  FS.unmount(path)
+  FS.rmdir(path)
+}
+
+function free (allocated) {
+  for (const a of allocated) {
+    if (a[1]) {
+      freeArray(a[0])
+    } else {
+      _free(a[0])
+    }
   }
 }
 
-async function clone (repo, path) {
-  path = await setupFs(path)
-  await awaitWorker()
+function makeWrapper(method) {
+  return async function (...rawArgs) {
+    // Wait for an available worker
+    while (!PThread.unusedWorkers.length) {
+      await new Promise((resolve) => setImmediate(resolve))
+    }
 
-  // Alloc stuff
-  const repoPtr = allocString(repo)
-  const pathPtr = allocString(path)
-  const [ promise, deferredPtr ] = allocDeferred()
-  function freeResources () {
-    _free(repoPtr)
-    _free(pathPtr)
-    freeDeferred(deferredPtr)
-    FS.unmount(path)
-    FS.rmdir(path)
+    const args = []
+    const toFree = []
+    const [ promise, deferredPtr ] = allocDeferred()
+    for (const arg of rawArgs) {
+      if (typeof arg === 'string') {
+        const ptr = allocString(arg)
+        toFree.push([ ptr ])
+        args.push(ptr)
+        continue
+      }
+
+      if (Array.isArray(arg)) {
+        const ptr = allocArray(arg)
+        toFree.push([ ptr, true ])
+        args.push(ptr)
+        continue
+      }
+
+      args.push(arg)
+    }
+
+    let res = Module[`_${method}`](...args, deferredPtr)
+    if (res < 0) {
+      free(toFree)
+      throw new Error('Failed to initialize git thread')
+    }
+
+    res = await promise
+    free(toFree)
+    if (res < 0) {
+      const error = new Error(`simple-git-wasm: call to ${method} failed: error code ${res}`)
+      error.code = res
+      throw error
+    }
   }
-
-  // Invoke our function -- note: unless an error occurred, it is unsafe to free resources before the promise resolves
-  let res = _clone(repoPtr, pathPtr, deferredPtr)
-  if (res < 0) {
-    freeResources()
-    throw new Error('Failed to initialize git thread')
-  }
-
-  res = await promise
-  freeResources()
-  return res
 }
 
-async function pull (path, force = false) {
-  path = await setupFs(path)
-  await awaitWorker()
-
-  // Alloc stuff
-  const pathPtr = allocString(path)
-  const [ promise, deferredPtr ] = allocDeferred()
-  function freeResources () {
-    _free(pathPtr)
-    freeDeferred(deferredPtr)
-    FS.unmount(path)
-    FS.rmdir(path)
-  }
-
-  // Invoke our function -- note: unless an error occurred, it is unsafe to free resources before the promise resolves
-  let res = _pull(pathPtr, force, deferredPtr)
-  if (res < 0) {
-    freeResources()
-    throw new Error('Failed to initialize git thread')
-  }
-
-  res = await promise
-  freeResources()
-  return res
-}
-
-async function listUpdates (path) {
-  path = await setupFs(path)
-
-  // Alloc stuff
-  const pathPtr = allocString(path)
-  const [ promise, deferredPtr ] = allocDeferred()
-  const [ ret, retPtr ] = allocArray()
-  function freeResources () {
-    _free(pathPtr)
-    freeDeferred(deferredPtr)
-    freeArray(retPtr)
-    FS.unmount(path)
-    FS.rmdir(path)
-  }
-
-  // Invoke our function -- note: unless an error occurred, it is unsafe to free resources before the promise resolves
-  let res = _list_updates(pathPtr, retPtr, deferredPtr)
-  if (res < 0) {
-    freeResources()
-    throw new Error('Failed to initialize git thread')
-  }
-
-  res = await promise
-  freeResources()
-  return res == 0 ? ret : null
-}
-
-Module['clone'] = clone
-Module['pull'] = pull
-Module['listUpdates'] = listUpdates
+Module['mount'] = mount
+Module['umount'] = umount
+Module['clone'] = makeWrapper('clone')
+Module['pull'] = makeWrapper('pull')
+Module['listUpdates'] = makeWrapper('list_updates')

@@ -55,9 +55,8 @@ function freeDeferred (ptr) {
 
 let arrayId = 0
 const arrayMap = new Map()
-function allocArray () {
+function allocArray (array) {
   const ptr = arrayId++
-  const array = []
   arrayMap.set(ptr, array)
   return [ array, ptr ]
 }

@@ -37,36 +37,43 @@ async function getLibgit () {
 
 async function clone (repo, path) {
   const libgit = await getLibgit()
-  const ret = await libgit.clone(repo, resolve(path))
-  if (ret < 0) {
-    const error = new Error('failed to clone git repository')
-    error.code = ret
-    throw error
+  path = libgit.mount(resolve(path))
+  try {
+    await libgit.clone(repo, path)
+  } finally {
+    libgit.umount(path)
   }
 }
 
 async function pull (path, skipFetch = false, force = false) {
   const libgit = await getLibgit()
-  const ret = await libgit.pull(resolve(path), skipFetch, force)
-  if (ret < 0) {
-    const error = new Error('failed to clone git repository')
-    error.code = ret
-    throw error
+  path = libgit.mount(resolve(path))
+  try {
+    await libgit.pull(path, skipFetch, force)
+  } finally {
+    libgit.umount(path)
   }
 }
 
 async function listUpdates (path, force = false) {
   const libgit = await getLibgit()
-  const updates = await libgit.listUpdates(resolve(path), force)
-  const res = []
-  for (let i = 0; i < updates.length;) {
-    res.push({
-      message: updates[i++],
-      author: updates[i++]
+  path = libgit.mount(resolve(path))
+  let res
+  try {
+    res = await libgit.pull(resolve(path), skipFetch, force)
+  } finally {
+    libgit.umount(path)
+  }
+
+  const updates = []
+  for (let i = 0; i < res.length;) {
+    updates.push({
+      message: res[i++],
+      author: res[i++]
     })
   }
 
-  return res
+  return updates
 }
 
 module.exports = {
