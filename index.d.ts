@@ -27,8 +27,13 @@
 
 declare module '@powercord/simple-git-wasm' {
   export type Commit = { id: string, message: string, author: string }
-  export type Upstream = { name: string, url: string, repo: string }
-  export type RepositoryMeta = { detached: true } | { detached: false, branch: string, revision: string | null, upstream: Upstream | null }
+  export type RepositoryMeta = {
+    detached: boolean,
+    branch: string | null,
+    revision: string | null,
+    upstream: string | null,
+    repo: string | null
+  }
 
   /**
    * Clones a repository in a specified path. Only HTTP(S) urls are supported.

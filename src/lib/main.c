@@ -28,22 +28,14 @@
 #include <emscripten.h>
 #include <pthread.h>
 #include <time.h>
-
-#include <git2/global.h>
-#include <git2/clone.h>
-#include <git2/submodule.h>
-#include <git2/signature.h>
-#include <git2/repository.h>
-#include <git2/remote.h>
-#include <git2/stash.h>
-#include <git2/oid.h>
-#include <git2/revwalk.h>
-#include <git2/commit.h>
+#include <git2.h>
 
 // libgit2 doesn't support shallow clone -- see https://github.com/libgit2/libgit2/issues/3058
 // note: a patch to libgit is necessary to get clone to work -- see https://github.com/libgit2/libgit2/pull/5935
 
 #define UNUSED(X) (void)(X)
+
+// JS functions
 #define RESOLVE(PTR, RET) MAIN_THREAD_EM_ASM({ invokeDeferred($0, $1); }, PTR, RET)
 
 // Funni macros
@@ -313,6 +305,42 @@ int list_updates(char* path, int ret_ptr, int resolve_ptr) {
   ERR_CHECK(pthread_create(&pid, NULL, list_repository_updates, (void*) payload));
   ERR_CHECK(pthread_detach(pid));
   return 0;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int read_repository_meta(char* path, int ret_ptr) {
+  int ret = 0;
+  git_oid revision;
+
+  git_repository* repo;
+  git_reference* head_ref;
+  git_remote* remote;
+
+  ERR_CHECK(git_repository_open(&repo, path), cfg_end);
+
+	ret = git_repository_head(&head_ref, repo);
+	if (ret < 0 && ret != GIT_EUNBORNBRANCH && ret != GIT_ENOTFOUND) goto cfg_end;
+
+  ret = git_reference_name_to_id(&revision, repo, "HEAD");
+	if (ret < 0 && ret != GIT_ENOTFOUND) goto cfg_end;
+
+  ret = git_remote_lookup(&remote, repo, "origin");
+	if (ret < 0 && ret != GIT_ENOTFOUND) goto cfg_end;
+
+  EM_ASM(
+    { arrayPush($0, $1, UTF8ToString($2), UTF8ToString($3), UTF8ToString($4), UTF8ToString($6)) },
+    ret_ptr,
+    git_repository_head_detached(repo),
+    head_ref != NULL ? git_reference_shorthand(head_ref) : "",
+    revision.id != NULL ? git_oid_tostr_s(&revision) : "",
+    remote != NULL ? git_remote_url(remote) : ""
+  );
+
+cfg_end:
+  git_remote_free(remote);
+  git_reference_free(head_ref);
+  git_repository_free(repo);
+  return ret;
 }
 
 int main() {

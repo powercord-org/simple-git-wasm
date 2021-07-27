@@ -56,17 +56,19 @@ function free (allocated) {
   }
 }
 
-function makeWrapper (method, returns = false) {
+function makeWrapper (method, returns = false, threaded = true) {
   return async function (...rawArgs) {
-    // Wait for an available worker
-    while (!PThread.unusedWorkers.length) {
-      await new Promise((resolve) => setImmediate(resolve))
+    if (threaded) {
+      // Wait for an available worker
+      while (!PThread.unusedWorkers.length) {
+        await new Promise((resolve) => setImmediate(resolve))
+      }
     }
 
     let ret = void 0
     const args = []
     const toFree = []
-    const [ promise, deferredPtr ] = allocDeferred()
+    const [ promise, deferredPtr ] = threaded ? allocDeferred() : []
     for (const arg of rawArgs) {
       if (typeof arg === 'string') {
         const ptr = allocString(arg)
@@ -85,12 +87,15 @@ function makeWrapper (method, returns = false) {
     }
 
     let res = Module[`_${method}`](...args, deferredPtr)
-    if (res < 0) {
-      free(toFree)
-      throw new Error('Failed to initialize git thread')
+    if (threaded) {
+      if (res < 0) {
+        free(toFree)
+        throw new Error('Failed to initialize git thread')
+      }
+
+      res = await promise
     }
 
-    res = await promise
     free(toFree)
     if (res < 0) {
       const error = new Error(`simple-git-wasm: call to ${method} failed: error code ${res}`)
@@ -108,3 +113,4 @@ Module['umount'] = umount
 Module['clone'] = makeWrapper('clone')
 Module['pull'] = makeWrapper('pull')
 Module['listUpdates'] = makeWrapper('list_updates', true)
+Module['readRepositoryMeta'] = makeWrapper('read_repository_meta', true, false)

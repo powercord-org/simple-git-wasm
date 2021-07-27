@@ -27,7 +27,6 @@
 
 const { resolve } = require('path')
 const libgitFactory = require('./wasm/libgit.js')
-const config = require('./config.js')
 
 let libgitPromise
 async function getLibgit () {
@@ -78,9 +77,29 @@ async function listUpdates (path) {
   return updates
 }
 
+const GIT_URL_RE = /^(?:https?:\/\/[^/]+\/|[^@]+@[^:]+:)(.*?)(?:\.git)?$/
+async function readRepositoryMeta (path) {
+  const libgit = await getLibgit()
+  path = await libgit.mount(resolve(path))
+  let res
+  try {
+    res = await libgit.readRepositoryMeta(path)
+  } finally {
+    libgit.umount(path)
+  }
+
+  return {
+    detached: Boolean(res[0]),
+    branch: res[1] || null,
+    revision: res[2] || null,
+    upstream: res[3] || null,
+    repo: res[3] ? res[3].match(GIT_URL_RE)?.[1] : null
+  }
+}
+
 module.exports = {
   clone: clone,
   pull: pull,
   listUpdates: listUpdates,
-  ...config,
+  readRepositoryMeta: readRepositoryMeta
 }
