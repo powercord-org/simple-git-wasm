@@ -47,7 +47,6 @@ function allocDeferred () {
 // eslint-disable-next-line no-unused-vars
 function invokeDeferred (ptr, ...args) {
   const resolve = deferredMap.get(ptr)
-  if (!resolve) throw new Error('segmentation fault')
   deferredMap.delete(ptr)
   resolve(...args)
 }
@@ -69,9 +68,7 @@ function allocArray () {
 
 // eslint-disable-next-line no-unused-vars
 function arrayPush (ptr, ...data) {
-  const array = arrayMap.get(ptr)
-  if (!array) throw new Error('segmentation fault')
-  array.push(...data)
+  arrayMap.get(ptr).push(...data)
 }
 
 // eslint-disable-next-line no-unused-vars

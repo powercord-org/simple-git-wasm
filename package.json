@@ -1,6 +1,6 @@
 {
   "name": "@powercord/simple-git-wasm",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A (relatively) small node library to clone and pull git repositories in a standalone manner thanks to libgit2, powered by WebAssembly and Emscripten",
   "repository": "git@github.com:powercord-org/simple-git-wasm.git",
   "author": "Cynthia <cynthia@cynthia.dev>",
@@ -13,7 +13,7 @@
     "node": ">= 14"
   },
   "devDependencies": {
-    "eslint": "^7.24.0"
+    "eslint": "^8.0.1"
   },
   "exports": {
     ".": {

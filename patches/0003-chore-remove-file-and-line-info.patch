@@ -1,0 +1,39 @@
+From 2f20a6facf5a219b27e1c7cb35a76961667671f4 Mon Sep 17 00:00:00 2001
+From: Cynthia <cynthia@cynthia.dev>
+Date: Thu, 21 Oct 2021 22:42:35 +0200
+Subject: [PATCH 3/3] chore: remove file and line info
+
+---
+ src/alloc.h | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/src/alloc.h b/src/alloc.h
+index 04fb7e101..8042a7ff7 100644
+--- a/src/alloc.h
++++ b/src/alloc.h
+@@ -12,14 +12,14 @@
+ 
+ extern git_allocator git__allocator;
+ 
+-#define git__malloc(len)                      git__allocator.gmalloc(len, __FILE__, __LINE__)
+-#define git__calloc(nelem, elsize)            git__allocator.gcalloc(nelem, elsize, __FILE__, __LINE__)
+-#define git__strdup(str)                      git__allocator.gstrdup(str, __FILE__, __LINE__)
+-#define git__strndup(str, n)                  git__allocator.gstrndup(str, n, __FILE__, __LINE__)
+-#define git__substrdup(str, n)                git__allocator.gsubstrdup(str, n, __FILE__, __LINE__)
+-#define git__realloc(ptr, size)               git__allocator.grealloc(ptr, size, __FILE__, __LINE__)
+-#define git__reallocarray(ptr, nelem, elsize) git__allocator.greallocarray(ptr, nelem, elsize, __FILE__, __LINE__)
+-#define git__mallocarray(nelem, elsize)       git__allocator.gmallocarray(nelem, elsize, __FILE__, __LINE__)
++#define git__malloc(len)                      git__allocator.gmalloc(len, "lg2", 0)
++#define git__calloc(nelem, elsize)            git__allocator.gcalloc(nelem, elsize, "lg2", 0)
++#define git__strdup(str)                      git__allocator.gstrdup(str, "lg2", 0)
++#define git__strndup(str, n)                  git__allocator.gstrndup(str, n, "lg2", 0)
++#define git__substrdup(str, n)                git__allocator.gsubstrdup(str, n, "lg2", 0)
++#define git__realloc(ptr, size)               git__allocator.grealloc(ptr, size, "lg2", 0)
++#define git__reallocarray(ptr, nelem, elsize) git__allocator.greallocarray(ptr, nelem, elsize, "lg2", 0)
++#define git__mallocarray(nelem, elsize)       git__allocator.gmallocarray(nelem, elsize, "lg2", 0)
+ #define git__free                             git__allocator.gfree
+ 
+ /**
+-- 
+2.33.0
+

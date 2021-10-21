@@ -30,8 +30,8 @@
 #include <time.h>
 #include <git2.h>
 
-// libgit2 doesn't support shallow clone -- see https://github.com/libgit2/libgit2/issues/3058
-// note: a patch to libgit is necessary to get clone to work -- see https://github.com/libgit2/libgit2/pull/5935
+// libgit2 doesn't support shallow clone
+// see https://github.com/libgit2/libgit2/issues/3058
 
 #define UNUSED(X) (void)(X)
 

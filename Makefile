@@ -38,6 +38,7 @@ EMCC_FLAGS= -Wno-pthreads-mem-growth \
 	 -s TEXTDECODER=2 \
 	 -s MALLOC=emmalloc \
 	 -s SUPPORT_LONGJMP=0 \
+	 -s NODEJS_CATCH_REJECTION=0 \
 	 -pthread \
 	 -lnodefs.js \
 	 -o src/wasm/libgit.js \
@@ -48,16 +49,14 @@ EMCC_DEBUG_FLAGS= -O0 -g3 \
 	 -s LLD_REPORT_UNDEFINED \
 	 -s ASSERTIONS=1
 
-EMCC_BUILD_FLAGS= -Oz -flto --closure 1 -s USE_CLOSURE_COMPILER
+EMCC_BUILD_FLAGS= -O3 --closure 1 -s USE_CLOSURE_COMPILER
 
 libgit2/build/libgit2.a:
 	mkdir libgit2/build || true
 	cd libgit2 && git reset --hard
 
 	# Patches to reduce weight of the final binary & some fixes
-	cd libgit2 && git apply ../patches/lg2-no-errors.patch
-	cd libgit2 && git apply ../patches/lg2-no-filename.patch
-	cd libgit2 && git apply ../patches/lg2-fix-permissions-nodefs.patch
+	cd libgit2 && git apply ../patches/*.patch
 
 	# Use our own HTTP transport
 	rm libgit2/src/transports/http.c || true
@@ -66,7 +65,7 @@ libgit2/build/libgit2.a:
 	# Build the lib
 	cd libgit2/build && emcmake cmake \
 		-DCMAKE_BUILD_TYPE=Release \
-		-DCMAKE_C_FLAGS="-Oz -flto -pthread" \
+		-DCMAKE_C_FLAGS="-O3 -pthread" \
 		-DBUILD_SHARED_LIBS=OFF \
 		-DBUILD_CLAR=OFF \
 		-DUSE_HTTPS=OFF \

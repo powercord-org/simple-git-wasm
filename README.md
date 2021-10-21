@@ -60,7 +60,6 @@ try {
 
 ## Notes
 The following PRs are required for this to work:
- - https://github.com/libgit2/libgit2/pull/5935
  - https://github.com/emscripten-core/emscripten/pull/14722
 
 I (Cynthia) patched my Emscripten installation to strip things not needed but included in the final build.

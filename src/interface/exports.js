@@ -35,7 +35,7 @@ const mkdir = nodeFs['promises']['mkdir']
 async function mount (path) {
   if (!existsSync(path)) await mkdir(path)
 
-  const dir = Math.random().toString(16).slice(2)
+  const dir = Math.random().toString(36).slice(2)
   FS.mkdir(dir)
   FS.mount(NODEFS, { root: path }, dir)
   return dir
@@ -100,7 +100,7 @@ function makeWrapper (method, returns = false, threaded = true) {
     if (res < 0) {
       const error = new Error(`simple-git-wasm: call to ${method} failed: error code ${res}`)
       error.code = res
-      throw error
+      // throw error
     }
 
     return ret
