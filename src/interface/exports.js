@@ -100,7 +100,7 @@ function makeWrapper (method, returns = false, threaded = true) {
     if (res < 0) {
       const error = new Error(`simple-git-wasm: call to ${method} failed: error code ${res}`)
       error.code = res
-      // throw error
+      throw error
     }
 
     return ret
