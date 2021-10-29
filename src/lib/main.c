@@ -245,8 +245,6 @@ static void* list_repository_updates(void* payload) {
           ["author"]: UTF8ToString($3),
           ["date"]: new Date(($4 * 1e3) + (($5 << 32) * 1e3))
         });
-
-        freeArray($6);
       },
       opts->ret_ptr,
       git_oid_tostr_s(&oid),

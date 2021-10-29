@@ -30,12 +30,17 @@
 #include <git2/transport.h>
 #include "smart.h"
 #include "ssh.h"
+#include "http.h"
+
+const int fake_ssh = 554;
 
 int git_smart_subtransport_ssh(git_smart_subtransport** out, git_transport* owner, void* param) {
-	// todo: transform it in its equivalent http subtransform
-	return -1;
+	return git_smart_subtransport_http(out, owner, (void*) &fake_ssh);
+}
+
+int git_transport_ssh_with_paths(git_transport** out, git_remote* owner, void* param) {
+	return git_smart_subtransport_http(out, owner, (void*) &fake_ssh);
 }
 
 // Unused but required
-int git_transport_ssh_with_paths(git_transport** out, git_remote* owner, void* payload) { return -1; }
 int git_transport_ssh_global_init(void) { return 0; }
