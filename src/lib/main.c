@@ -193,7 +193,7 @@ pull_end:
   return NULL;
 }
 
-void* list_repository_updates(void* payload) {
+static void* list_repository_updates(void* payload) {
   int ret = 0;
   int entries;
   git_repository* repo;
@@ -234,16 +234,29 @@ void* list_repository_updates(void* payload) {
     char* message = malloc(74);
     get_short_commit_message(commit, message);
 
-    char* author;
-    author = git_commit_author(commit)->name;
+    char* author = git_commit_author(commit)->name;
+    int64_t date = git_commit_time(commit);
 
-    MAIN_THREAD_EM_ASM(
-      { arrayPush($0, UTF8ToString($1), UTF8ToString($2), UTF8ToString($3)) },
+    // todo: list updates files?
+    MAIN_THREAD_EM_ASM({
+        arrayPush($0, {
+          ["id"]: UTF8ToString($1),
+          ["message"]: UTF8ToString($2),
+          ["author"]: UTF8ToString($3),
+          ["date"]: new Date(($4 * 1e3) + (($5 << 32) * 1e3))
+        });
+
+        freeArray($6);
+      },
       opts->ret_ptr,
       git_oid_tostr_s(&oid),
       message,
-      author
+      author,
+      // 64 bits values don't play nicely
+      (int) (date & 0xffffffff),
+      (int) (date >> 32)
     );
+
     git_commit_free(commit);
     free(message);
   }

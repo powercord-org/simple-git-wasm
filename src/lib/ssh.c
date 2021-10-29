@@ -25,72 +25,17 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-const { resolve } = require('path')
-const libgitFactory = require('./wasm/libgit.js')
+// "Replacement" for libgit2 ssh transport, which just tries to transform the query to http
 
-let libgitPromise
-async function getLibgit () {
-  // Lazily init the wasm binary when we need it
-  if (!libgitPromise) libgitPromise = libgitFactory()
-  return libgitPromise
+#include <git2/transport.h>
+#include "smart.h"
+#include "ssh.h"
+
+int git_smart_subtransport_ssh(git_smart_subtransport** out, git_transport* owner, void* param) {
+	// todo: transform it in its equivalent http subtransform
+	return -1;
 }
 
-async function clone (repo, path) {
-  const libgit = await getLibgit()
-  path = await libgit.mount(resolve(path))
-  try {
-    await libgit.clone(repo, path)
-  } finally {
-    libgit.umount(path)
-  }
-}
-
-async function pull (path, skipFetch = false, force = false) {
-  const libgit = await getLibgit()
-  path = await libgit.mount(resolve(path))
-  try {
-    await libgit.pull(path, skipFetch, force)
-  } finally {
-    libgit.umount(path)
-  }
-}
-
-async function listUpdates (path) {
-  const libgit = await getLibgit()
-  path = await libgit.mount(resolve(path))
-  let res
-  try {
-    res = await libgit.listUpdates(path)
-  } finally {
-    libgit.umount(path)
-  }
-
-  return res;
-}
-
-const GIT_URL_RE = /^(?:https?:\/\/[^/]+\/|[^@]+@[^:]+:)(.*?)(?:\.git)?$/
-async function readRepositoryMeta (path) {
-  const libgit = await getLibgit()
-  path = await libgit.mount(resolve(path))
-  let res
-  try {
-    res = await libgit.readRepositoryMeta(path)
-  } finally {
-    libgit.umount(path)
-  }
-
-  return {
-    detached: Boolean(res[0]),
-    branch: res[1] || null,
-    revision: res[2] || null,
-    upstream: res[3] || null,
-    repo: res[3] ? res[3].match(GIT_URL_RE)?.[1] : null
-  }
-}
-
-module.exports = {
-  clone: clone,
-  pull: pull,
-  listUpdates: listUpdates,
-  readRepositoryMeta: readRepositoryMeta
-}
+// Unused but required
+int git_transport_ssh_with_paths(git_transport** out, git_remote* owner, void* payload) { return -1; }
+int git_transport_ssh_global_init(void) { return 0; }

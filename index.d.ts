@@ -26,7 +26,13 @@
  */
 
 declare module '@powercord/simple-git-wasm' {
-  export type Commit = { id: string, message: string, author: string }
+  export type Commit = {
+    id: string,
+    message: string,
+    author: string,
+    date: Date
+  }
+
   export type RepositoryMeta = {
     detached: boolean,
     branch: string | null,

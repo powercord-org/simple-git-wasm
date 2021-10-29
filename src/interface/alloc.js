@@ -72,6 +72,11 @@ function arrayPush (ptr, ...data) {
 }
 
 // eslint-disable-next-line no-unused-vars
+function arrayDeref (ptr) {
+  return arrayMap.get(ptr);
+}
+
+// eslint-disable-next-line no-unused-vars
 function freeArray (ptr) {
   return arrayMap.delete(ptr)
 }

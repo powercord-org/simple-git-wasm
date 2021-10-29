@@ -39,6 +39,11 @@ EMCC_FLAGS= -Wno-pthreads-mem-growth \
 	 -s MALLOC=emmalloc \
 	 -s SUPPORT_LONGJMP=0 \
 	 -s NODEJS_CATCH_REJECTION=0 \
+	 -s NODEJS_CATCH_EXIT=0 \
+	 -s INCOMING_MODULE_JS_API=[] \
+	 -s AUTO_JS_LIBRARIES=0 \
+	 -s AUTO_NATIVE_LIBRARIES=0 \
+	 -s AUTO_ARCHIVE_INDEXES=0 \
 	 -pthread \
 	 -lnodefs.js \
 	 -o src/wasm/libgit.js \
@@ -49,7 +54,7 @@ EMCC_DEBUG_FLAGS= -O0 -g3 \
 	 -s LLD_REPORT_UNDEFINED \
 	 -s ASSERTIONS=1
 
-EMCC_BUILD_FLAGS= -O3 --closure 1 -s USE_CLOSURE_COMPILER
+EMCC_BUILD_FLAGS= -Oz --closure 1 -s USE_CLOSURE_COMPILER
 
 libgit2/build/libgit2.a:
 	mkdir libgit2/build || true
@@ -60,12 +65,14 @@ libgit2/build/libgit2.a:
 
 	# Use our own HTTP transport
 	rm libgit2/src/transports/http.c || true
+	rm libgit2/src/transports/ssh.c || true
 	ln -s ../../../src/lib/http.c libgit2/src/transports/http.c
+	ln -s ../../../src/lib/ssh.c libgit2/src/transports/ssh.c
 
 	# Build the lib
 	cd libgit2/build && emcmake cmake \
 		-DCMAKE_BUILD_TYPE=Release \
-		-DCMAKE_C_FLAGS="-O3 -pthread" \
+		-DCMAKE_C_FLAGS="-Oz -pthread" \
 		-DBUILD_SHARED_LIBS=OFF \
 		-DBUILD_CLAR=OFF \
 		-DUSE_HTTPS=OFF \
